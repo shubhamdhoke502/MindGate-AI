@@ -43,3 +43,16 @@
 
 ### Changed
 - Updated `current_state.md` to mark Module 3 as completed.
+
+# MindGate AI — Change Log
+
+## [v0.4.0-alpha] - 2026-09-27
+
+### Added
+- Created `modules/app.py` implementing `MindGateEngine` class to orchestrate full RAG workflow.
+- Connected `PyMuPDF` parser, ChromaDB vector retrieval, and `Ollama` local SLM runtime.
+- Implemented grounded citation generation with explicit `[Source: Doc | Page X, Lines Y-Z]` formatting.
+- Integrated auto-synchronization between LLM output and `.mindgate/memory.json` (Container Box).
+
+### Changed
+- Updated `current_state.md` to reflect completion of all 4 core Python backend modules.
