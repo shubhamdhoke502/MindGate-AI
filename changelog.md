@@ -19,3 +19,15 @@
 
 ### Changed
 - Updated `current_state.md` to reflect the completion of Module 1.
+
+# MindGate AI — Change Log
+
+## [v0.2.0-alpha] - 2026-09-27
+
+### Added
+- Integrated `modules/vector_db.py` featuring `VectorStoreManager` for local ChromaDB operations and sentence-transformers embeddings.
+- Implemented `StorageCompressor` with `.mgdb` (ZIP format) compression and decompression logic to optimize disk footprint.
+- Added metadata filtering support for isolated multi-PDF vector querying.
+
+### Changed
+- Updated `current_state.md` to mark Module 2 as completed.
