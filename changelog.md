@@ -31,3 +31,15 @@
 
 ### Changed
 - Updated `current_state.md` to mark Module 2 as completed.
+
+# MindGate AI — Change Log
+
+## [v0.3.0-alpha] - 2026-09-27
+
+### Added
+- Integrated `modules/container.py` for local `.mindgate/memory.json` memory persistence.
+- Implemented `register_document` and `save_highlight` methods to store grounded citations and key insights.
+- Implemented `handle_at_trigger` method to handle `@` recall commands and return matching documents and highlights for UI integration.
+
+### Changed
+- Updated `current_state.md` to mark Module 3 as completed.
