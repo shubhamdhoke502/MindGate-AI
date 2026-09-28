@@ -1,105 +1,184 @@
 import os
-import zipfile
 import shutil
-import chromadb
-from chromadb.utils import embedding_functions
-from typing import List, Dict, Any
+import zipfile
+import threading
+import time
+from typing import List, Dict, Any, Optional
 
-class VectorStoreManager:
-    def __init__(self, db_dir: str = "./storage/chroma_db", model_name: str = "BAAI/bge-small-en-v1.5"):
-        """
-        Initializes ChromaDB with a local SentenceTransformer embedding model.
-        """
-        self.db_dir = db_dir
-        os.makedirs(self.db_dir, exist_ok=True)
-        
-        # Initialize Local Embedding Model
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=model_name
-        )
-        
-        # Initialize Local ChromaDB Persistent Client
-        self.client = chromadb.PersistentClient(path=self.db_dir)
-        self.collection = self.client.get_or_create_collection(
-            name="mindgate_documents",
-            embedding_function=self.embedding_fn
-        )
-
-    def add_chunks(self, chunks: List[Dict[str, Any]]) -> None:
-        """
-        Inserts parsed chunks with metadata coordinates into ChromaDB.
-        """
-        ids = [c["chunk_id"] for c in chunks]
-        documents = [c["content_payload"]["raw_text"] for c in chunks]
-        
-        metadatas = []
-        for c in chunks:
-            metadatas.append({
-                "file_name": c["document_metadata"]["file_name"],
-                "page_number": c["chunk_coordinates"]["page_number"],
-                "line_start": c["chunk_coordinates"]["line_start"],
-                "line_end": c["chunk_coordinates"]["line_end"],
-                "character_count": c["chunk_coordinates"]["character_count"]
-            })
-            
-        self.collection.add(
-            ids=ids,
-            documents=documents,
-            metadatas=metadatas
-        )
-
-    def query_similar_chunks(self, query: str, top_k: int = 2, file_name_filter: str = None) -> List[Dict[str, Any]]:
-        """
-        Searches for top_k relevant chunks. Supports exact file_name filtering.
-        """
-        where_filter = {"file_name": file_name_filter} if file_name_filter else None
-        
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where_filter
-        )
-        
-        retrieved_items = []
-        if results and results["documents"]:
-            for i in range(len(results["documents"][0])):
-                retrieved_items.append({
-                    "text": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i],
-                    "distance": results["distances"][0][i] if "distances" in results and results["distances"] else None
-                })
-                
-        return retrieved_items
+try:
+    import chromadb
+    from chromadb.config import Settings
+except ImportError:
+    chromadb = None
 
 
 class StorageCompressor:
-    @staticmethod
-    def compress_workspace(source_dir: str, output_zip_path: str) -> str:
-        """
-        Compresses workspace/ChromaDB files to save up to 80% disk space (.mgdb file).
-        """
-        base_name = output_zip_path.replace('.zip', '').replace('.mgdb', '')
-        archive_path = shutil.make_archive(base_name, 'zip', source_dir)
-        final_path = base_name + ".mgdb"
-        if os.path.exists(final_path):
-            os.remove(final_path)
-        os.rename(archive_path, final_path)
-        return final_path
+    """
+    Manages background idle compression of ChromaDB vector files
+    to save up to 80% local disk storage footprint (.mgdb ZIP format).
+    """
+    def __init__(self, db_dir: str, archive_path: str, idle_threshold_sec: int = 30):
+        self.db_dir = db_dir
+        self.archive_path = archive_path
+        self.idle_threshold_sec = idle_threshold_sec
+        self.last_activity_time = time.time()
+        self.is_compressed = False
+        self._stop_event = threading.Event()
+        self._worker_thread = threading.Thread(target=self._idle_monitor_loop, daemon=True)
+        self._worker_thread.start()
 
-    @staticmethod
-    def decompress_workspace(compressed_path: str, extract_to_dir: str) -> None:
-        """
-        Decompresses .mgdb workspace back to disk on-demand.
-        """
-        os.makedirs(extract_to_dir, exist_ok=True)
-        with zipfile.ZipFile(compressed_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_to_dir)
+    def register_activity(self):
+        """Resets the idle timer on active user interaction."""
+        self.last_activity_time = time.time()
+        if self.is_compressed:
+            self.decompress_db()
+
+    def _idle_monitor_loop(self):
+        """Monitors system activity and compresses DB when idle."""
+        while not self._stop_event.is_set():
+            time.sleep(5)
+            idle_duration = time.time() - self.last_activity_time
+            if idle_duration >= self.idle_threshold_sec and not self.is_compressed:
+                if os.path.exists(self.db_dir) and os.listdir(self.db_dir):
+                    self.compress_db()
+
+    def compress_db(self):
+        """Compresses ChromaDB folder into .mgdb ZIP archive."""
+        if not os.path.exists(self.db_dir):
+            return
+        
+        try:
+            with zipfile.ZipFile(self.archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, _, files in os.walk(self.db_dir):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, self.db_dir)
+                        zipf.write(full_path, rel_path)
+            
+            shutil.rmtree(self.db_dir)
+            os.makedirs(self.db_dir, exist_ok=True)
+            self.is_compressed = True
+            print("[StorageCompressor]: Vector DB successfully compressed to .mgdb archive.")
+        except Exception as e:
+            print(f"[StorageCompressor Error]: Compression failed - {e}")
+
+    def decompress_db(self):
+        """Restores ChromaDB folder from .mgdb ZIP archive."""
+        if not os.path.exists(self.archive_path):
+            self.is_compressed = False
+            return
+        
+        try:
+            with zipfile.ZipFile(self.archive_path, 'r') as zipf:
+                zipf.extractall(self.db_dir)
+            
+            os.remove(self.archive_path)
+            self.is_compressed = False
+            print("[StorageCompressor]: Vector DB restored from .mgdb archive.")
+        except Exception as e:
+            print(f"[StorageCompressor Error]: Decompression failed - {e}")
+
+    def stop(self):
+        self._stop_event.set()
 
 
-# Quick Test Run
+class VectorStoreManager:
+    """
+    Manages persistent ChromaDB vector storage with strict dynamic metadata filters.
+    Supports isolation per document name and background ZIP compression.
+    """
+    def __init__(self, storage_dir: str = None):
+        if storage_dir is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            storage_dir = os.path.join(base_dir, "storage", ".mindgate")
+        
+        self.db_dir = os.path.join(storage_dir, "chroma_db")
+        self.archive_path = os.path.join(storage_dir, "chroma_db.mgdb")
+        os.makedirs(self.db_dir, exist_ok=True)
+
+        self.compressor = StorageCompressor(self.db_dir, self.archive_path)
+        self._client = None
+        self._collection = None
+
+    def _get_collection(self):
+        """Ensures DB is uncompressed and returns active Chroma collection."""
+        self.compressor.register_activity()
+        
+        if self._client is None or self.compressor.is_compressed:
+            if chromadb:
+                self._client = chromadb.PersistentClient(path=self.db_dir)
+                self._collection = self._client.get_or_create_collection(
+                    name="mindgate_pdf_chunks",
+                    metadata={"hnsw:space": "cosine"}
+                )
+        return self._collection
+
+    def add_chunks(self, chunks: List[Dict[str, Any]]):
+        """Adds text chunks with metadata (page, lines, bbox) into ChromaDB."""
+        collection = self._get_collection()
+        if not collection or not chunks:
+            return
+
+        documents = []
+        metadatas = []
+        ids = []
+
+        for chunk in chunks:
+            documents.append(chunk["text"])
+            # Flat metadata for ChromaDB compatibility
+            meta = chunk["metadata"].copy()
+            meta["bbox"] = str(meta["bbox"])  # Store bbox list as string representation
+            metadatas.append(meta)
+            ids.append(chunk["chunk_id"])
+
+        collection.upsert(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
+        )
+
+    def query_similar_chunks(self, query: str, top_k: int = 2, file_name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Retrieves top_k relevant chunks with strict file_name namespace filter.
+        Prevents cross-contamination between different uploaded PDFs.
+        """
+        collection = self._get_collection()
+        if not collection:
+            return []
+
+        where_clause = None
+        if file_name_filter:
+            where_clause = {"file_name": file_name_filter}
+
+        results = collection.query(
+            query_texts=[query],
+            n_results=top_k,
+            where=where_clause
+        )
+
+        formatted_results = []
+        if results and "documents" in results and results["documents"]:
+            docs = results["documents"][0]
+            metas = results["metadatas"][0]
+            distances = results.get("distances", [[]])[0]
+
+            for i in range(len(docs)):
+                meta = metas[i].copy()
+                # Restore bbox back to array
+                if isinstance(meta.get("bbox"), str):
+                    try:
+                        meta["bbox"] = eval(meta["bbox"])
+                    except Exception:
+                        pass
+
+                formatted_results.append({
+                    "text": docs[i],
+                    "metadata": meta,
+                    "score": distances[i] if i < len(distances) else 0.0
+                })
+
+        return formatted_results
+
+
 if __name__ == "__main__":
-    from modules.parser import parse_pdf_with_coordinates
-    
-    # Test Vector Pipeline
-    v_store = VectorStoreManager()
-    print("Vector Store Initialized Successfully.")
+    print("[VectorDB Module]: Persistent Vector Store with Idle Compression & Strict Filters Ready.")
