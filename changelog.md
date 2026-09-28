@@ -67,3 +67,13 @@
 
 ### Changed
 - Updated `current_state.md` to reflect completion of the UI Server and Desktop Frontend interface layer.
+
+# MindGate AI — Change Log
+
+## [v0.6.0-alpha] - 2026-09-28
+
+### Added
+- Created `scripts/init_storage.py` to auto-provision local `storage/` and `.mindgate/memory.json` workspace structure on first boot.
+
+### Changed
+- Updated `current_state.md` reflecting completion of storage management setup.
