@@ -96,3 +96,12 @@
 ### Refactored
 - Upgraded `modules/parser.py` with Devnagari script normalization (`unicodedata.normalize('NFC')`), broken glyph regex fixing, and exact PDF Bounding Box coordinates (`bbox`: `[x0, y0, x1, y1]`) stored in chunk metadata.
 - Updated `current_state.md` to reflect completion of deep parser refactoring.
+
+# MindGate AI — Change Log
+
+## [v0.9.3-alpha] - 2026-09-28
+
+### Refactored
+- Upgraded `modules/vector_db.py` with `StorageCompressor` class for automated background idle compression (`.mgdb` ZIP file) after 30 seconds of inactivity.
+- Enforced strict dynamic `file_name` metadata filtering in ChromaDB queries to prevent multi-document context pollution.
+- Updated `current_state.md` to track vector engine completion.
