@@ -77,3 +77,14 @@
 
 ### Changed
 - Updated `current_state.md` reflecting completion of storage management setup.
+
+# MindGate AI — Change Log
+
+## [v0.7.0-alpha] - 2026-09-28
+
+### Added
+- Created `modules/chat_history.py` for persistent user/assistant message logging in `.mindgate/chat_history.json`.
+- Created `modules/chunk_cache.py` to cache extracted PDF chunks, coordinates, and page metadata in `.mindgate/chunks_cache/` using file hashing (MD5).
+
+### Changed
+- Updated `current_state.md` to reflect new chat persistence and caching architecture modules.
