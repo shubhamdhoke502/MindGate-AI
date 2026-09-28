@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindGate AI — Standalone Privacy-First Engine</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 300px; background: #1e293b; border-right: 1px solid #334155; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        .sidebar h2 { font-size: 1.2rem; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+        .upload-box { border: 2px dashed #475569; padding: 20px; border-radius: 8px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .upload-box:hover { border-color: #38bdf8; background: #0f172a55; }
+        .doc-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .doc-item { background: #334155; padding: 10px; border-radius: 6px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Chat Main Workspace */
+        .chat-container { flex: 1; display: flex; flex-direction: column; height: 100vh; }
+        .header { height: 60px; border-bottom: 1px solid #334155; display: flex; align-items: center; padding: 0 20px; justify-content: space-between; background: #1e293b; }
+        .status-badge { background: #10b98122; color: #34d399; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; border: 1px solid #059669; }
+        
+        .chat-history { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 10px; font-size: 0.95rem; line-height: 1.5; }
+        .user-msg { align-self: flex-end; background: #0284c7; color: white; border-bottom-right-radius: 2px; }
+        .ai-msg { align-self: flex-start; background: #1e293b; border: 1px solid #334155; border-bottom-left-radius: 2px; }
+        
+        .citations { margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155; font-size: 0.8rem; color: #94a3b8; }
+        .citation-tag { display: inline-block; background: #0f172a; border: 1px solid #38bdf8; color: #38bdf8; padding: 2px 6px; border-radius: 4px; margin-top: 4px; cursor: pointer; }
+        
+        /* Input Box */
+        .input-area { padding: 20px; background: #1e293b; border-top: 1px solid #334155; display: flex; gap: 10px; position: relative; }
+        .input-area input { flex: 1; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px; color: white; outline: none; }
+        .input-area input:focus { border-color: #38bdf8; }
+        .input-area button { background: #0284c7; color: white; border: none; padding: 0 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        
+        /* @ Container Box Popup */
+        .memory-popup { position: absolute; bottom: 70px; left: 20px; right: 20px; background: #1e293b; border: 1px solid #38bdf8; border-radius: 8px; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100; }
+        .popup-item { padding: 10px 15px; border-bottom: 1px solid #334155; cursor: pointer; font-size: 0.85rem; }
+        .popup-item:hover { background: #334155; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>MindGate AI</h2>
+        <div class="upload-box" onclick="ingestPathPrompt()">
+            <p><strong>+ Ingest PDF File</strong></p>
+            <p style="font-size:0.75rem; color:#94a3b8; margin-top:5px;">Enter local absolute path</p>
+        </div>
+        <div class="doc-list" id="docList">
+            <!-- Indexed Docs will show here -->
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div class="header">
+            <h3>Workspace Chat</h3>
+            <span class="status-badge">● 100% Offline (Phi-3)</span>
+        </div>
+
+        <div class="chat-history" id="chatHistory">
+            <div class="message ai-msg">
+                MindGate Engine Active. Drop/Ingest a PDF or type <code>@</code> to view saved container memory highlights.
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="memory-popup" id="memoryPopup"></div>
+            <input type="text" id="queryInput" placeholder="Ask a question or type @ for Container Box..." oninput="handleInput(this)">
+            <button onclick="sendQuery()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000/api";
+
+        async function ingestPathPrompt() {
+            const path = prompt("Enter full absolute path to PDF file:");
+            if (!path) return;
+
+            try {
+                const res = await fetch(`${API_URL}/ingest`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pdf_path: path })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Successfully indexed ${data.file_name} (${data.total_chunks_indexed} chunks)`);
+                    addDocToList(data.file_name);
+                } else {
+                    alert(`Error: ${data.detail}`);
+                }
+            } catch (err) {
+                alert("Server error. Ensure app_server.py is running!");
+            }
+        }
+
+        function addDocToList(fileName) {
+            const docList = document.getElementById('docList');
+            const item = document.createElement('div');
+            item.className = 'doc-item';
+            item.innerHTML = `<span>📄 ${fileName}</span>`;
+            docList.appendChild(item);
+        }
+
+        async function sendQuery() {
+            const input = document.getElementById('queryInput');
+            const query = input.value.trim();
+            if (!query) return;
+
+            appendMessage(query, 'user-msg');
+            input.value = '';
+            closePopup();
+
+            try {
+                const res = await fetch(`${API_URL}/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await res.json();
+
+                if (data.answer) {
+                    let text = data.answer;
+                    let citationsHtml = '';
+                    if (data.citations && data.citations.length > 0) {
+                        citationsHtml = '<div class="citations"><b>Sources:</b><br>' + 
+                            data.citations.map(c => `<span class="citation-tag">${c.citation_text}</span>`).join(' ') + '</div>';
+                    }
+                    appendMessage(text + citationsHtml, 'ai-msg');
+                } else if (data.highlights || data.documents) {
+                    // Container Memory recall response
+                    let memText = `<b>Container Box Memory Recall:</b><br>`;
+                    if (data.highlights) {
+                        data.highlights.forEach(h => {
+                            memText += `• [${h.pdf_name} | Page ${h.page}]: ${h.key_fact}<br>`;
+                        });
+                    }
+                    appendMessage(memText, 'ai-msg');
+                }
+            } catch (err) {
+                appendMessage("[Error]: Backend API connect nahi ho pa rahi hai.", 'ai-msg');
+            }
+        }
+
+        function appendMessage(htmlContent, typeClass) {
+            const history = document.getElementById('chatHistory');
+            const msg = document.createElement('div');
+            msg.className = `message ${typeClass}`;
+            msg.innerHTML = htmlContent;
+            history.appendChild(msg);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function handleInput(input) {
+            if (input.value.startsWith("@")) {
+                showMemoryTrigger(input.value.substring(1));
+            } else {
+                closePopup();
+            }
+        }
+
+        async function showMemoryTrigger(term) {
+            const popup = document.getElementById('memoryPopup');
+            try {
+                const res = await fetch(`${API_URL}/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: "@" + term })
+                });
+                const data = await res.json();
+                if (data.highlights && data.highlights.length > 0) {
+                    popup.innerHTML = data.highlights.map(h => 
+                        `<div class="popup-item" onclick="selectMemory('${h.key_fact}')">
+                            <b>${h.pdf_name} (Pg ${h.page})</b>: ${h.key_fact}
+                         </div>`
+                    ).join('');
+                    popup.style.display = 'block';
+                } else {
+                    popup.innerHTML = `<div class="popup-item">No memory highlights found</div>`;
+                    popup.style.display = 'block';
+                }
+            } catch (e) {
+                closePopup();
+            }
+        }
+
+        function selectMemory(fact) {
+            document.getElementById('queryInput').value = fact;
+            closePopup();
+        }
+
+        function closePopup() {
+            document.getElementById('memoryPopup').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
