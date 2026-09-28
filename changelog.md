@@ -56,3 +56,14 @@
 
 ### Changed
 - Updated `current_state.md` to reflect completion of all 4 core Python backend modules.
+
+# MindGate AI — Change Log
+
+## [v0.5.0-alpha] - 2026-09-28
+
+### Added
+- Created `ui/app_server.py` using FastAPI to serve `/api/ingest` and `/api/ask` REST endpoints connecting frontend to `MindGateEngine`.
+- Created `ui/index.html` implementing clean dark-mode GUI with PDF ingestion, grounded citation rendering, and `@` memory recall popup interface.
+
+### Changed
+- Updated `current_state.md` to reflect completion of the UI Server and Desktop Frontend interface layer.
