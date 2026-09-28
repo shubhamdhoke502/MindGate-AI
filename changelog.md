@@ -88,3 +88,11 @@
 
 ### Changed
 - Updated `current_state.md` to reflect new chat persistence and caching architecture modules.
+
+# MindGate AI — Change Log
+
+## [v0.9.2-alpha] - 2026-09-28
+
+### Refactored
+- Upgraded `modules/parser.py` with Devnagari script normalization (`unicodedata.normalize('NFC')`), broken glyph regex fixing, and exact PDF Bounding Box coordinates (`bbox`: `[x0, y0, x1, y1]`) stored in chunk metadata.
+- Updated `current_state.md` to reflect completion of deep parser refactoring.
