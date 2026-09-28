@@ -98,7 +98,7 @@ class StorageCompressor:
 
 # Quick Test Run
 if __name__ == "__main__":
-    from parser import parse_pdf_with_coordinates
+    from modules.parser import parse_pdf_with_coordinates
     
     # Test Vector Pipeline
     v_store = VectorStoreManager()

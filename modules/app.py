@@ -3,7 +3,7 @@ import urllib.request
 import urllib.parse
 from typing import Dict, Any, List
 
-from parser import parse_pdf_with_coordinates
+from modules.parser import parse_pdf_with_coordinates
 from vector_db import VectorStoreManager, StorageCompressor
 from container import ContainerMemoryManager
 
