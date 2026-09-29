@@ -157,3 +157,13 @@
 ## [1.1.0] - Step 1: Layout-Aware Parser
 ### Added
 - Production-grade PyMuPDF parser (`parser.py`) for extracting text, table structures, and bounding box coordinates.
+
+# CHANGELOG - MindGate AI Engine
+
+## [1.6.0] - Step 6: REST API Server Implementation
+### Added
+- Created `app_server.py` using FastAPI for orchestrating backend routes.
+- Added `/workspace/init` endpoint for dynamic workspace partitioning.
+- Added `/upload` endpoint for PDF ingestion per session.
+- Added `/chat` and `/chat/stream` SSE streaming endpoints.
+- Added `/system/flush` endpoint for dynamic RAM/VRAM resource management.
