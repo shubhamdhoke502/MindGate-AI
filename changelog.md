@@ -123,3 +123,12 @@
 - Integrated BM25 Sparse Keyword Search Engine (`BM25SearchEngine`) in `modules/vector_db.py`.
 - Implemented Reciprocal Rank Fusion (RRF) algorithm to merge dense vector embeddings with sparse keyword search scores, fixing exact numeric and serial number search misses.
 - Updated `current_state.md` for Step 2 completion.
+
+# MindGate AI — Change Log
+
+## [v1.3.0-prod] - 2026-09-29
+
+### Added
+- Integrated Server-Sent Events (SSE) streaming endpoint `/api/ask_stream` in `ui/app_server.py`.
+- Added generator-based token streaming (`ask_stream`) in `modules/app.py`.
+- Implemented stream buffer decoder in `ui/index.html` for typewriter-style real-time token rendering.
