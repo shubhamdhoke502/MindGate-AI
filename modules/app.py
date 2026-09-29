@@ -25,10 +25,14 @@ class MindGateEngine:
 
     def ingest_document(self, pdf_path: str) -> Dict[str, Any]:
         """
-        Step 1: Check Cache -> Step 2: Parse PDF if missing -> Step 3: Store Vector DB -> Step 4: Register Container.
+        Step 1: Activity Lock Register -> Step 2: Check Cache -> Step 3: Parse PDF -> Step 4: Store Vector DB -> Step 5: Register Container.
         """
-        file_name = pdf_path.split("/")[-1].split("\\")[-1]
+        file_name = os.path.basename(pdf_path)
         
+        # 0. Register activity to auto-decompress DB if idle-compressed
+        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
+            self.vector_store.compressor.register_activity()
+
         # 1. Check Disk Cache first
         cached_chunks = self.chunk_cache.get_cached_chunks(pdf_path)
         if cached_chunks:
@@ -36,8 +40,12 @@ class MindGateEngine:
         else:
             # Parse fresh PDF and save to cache
             chunks = parse_pdf_with_coordinates(pdf_path)
-            self.chunk_cache.save_chunks_to_cache(pdf_path, chunks)
+            if chunks:
+                self.chunk_cache.save_chunks_to_cache(pdf_path, chunks)
         
+        if not chunks:
+            return {"status": "error", "message": "No text extracted from PDF."}
+
         # 2. Add Chunks to Local Vector DB
         self.vector_store.add_chunks(chunks)
         
@@ -78,6 +86,10 @@ class MindGateEngine:
             search_term = query[1:]
             return self.container_memory.handle_at_trigger(search_term)
 
+        # 0. Decompress DB if needed
+        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
+            self.vector_store.compressor.register_activity()
+
         # 1. Save User Query in Chat History
         self.chat_history.save_message(role="user", content=query)
 
@@ -94,14 +106,19 @@ class MindGateEngine:
         context_str = ""
         citations = []
         for idx, item in enumerate(retrieved_chunks):
-            meta = item["metadata"]
-            citation_label = f"[Source: {meta['file_name']} | Page {meta['page_number']}, Lines {meta['line_start']}-{meta['line_end']}]"
-            context_str += f"Context Block {idx+1} ({citation_label}):\n{item['text']}\n\n"
+            meta = item.get("metadata", {})
+            file_n = meta.get('file_name', 'Document')
+            p_num = meta.get('page_number', 1)
+            l_start = meta.get('line_start', 1)
+            l_end = meta.get('line_end', 1)
+            
+            citation_label = f"[Source: {file_n} | Page {p_num}, Lines {l_start}-{l_end}]"
+            context_str += f"Context Block {idx+1} ({citation_label}):\n{item.get('text', '')}\n\n"
             
             citations.append({
-                "file_name": meta["file_name"],
-                "page": meta["page_number"],
-                "lines": f"{meta['line_start']}-{meta['line_end']}",
+                "file_name": file_n,
+                "page": p_num,
+                "lines": f"{l_start}-{l_end}",
                 "citation_text": citation_label
             })
 
@@ -122,7 +139,7 @@ class MindGateEngine:
         # 6. Save Assistant Response with Citations in Chat History
         self.chat_history.save_message(role="assistant", content=slm_response, citations=citations)
 
-        # 7. Background Sync into Container Memory Boxx
+        # 7. Background Sync into Container Memory Box
         if citations:
             top_meta = citations[0]
             self.container_memory.save_highlight(
@@ -139,6 +156,14 @@ class MindGateEngine:
             "answer": slm_response,
             "citations": citations
         }
+
+    def ask_stream(self, query: str, active_pdf: Optional[str] = None) -> Generator[str, None, None]:
+        """Server-Sent Events (SSE) compatible streaming token response generator."""
+        res = self.ask(query, active_pdf)
+        ans = res.get("answer", "")
+        # Stream response word by word for real-time streaming effect
+        for word in ans.split(" "):
+            yield f"data: {json.dumps({'token': word + ' '})}\n\n"
 
     def get_chat_history(self) -> List[Dict]:
         """Returns all persistent chat messages."""
