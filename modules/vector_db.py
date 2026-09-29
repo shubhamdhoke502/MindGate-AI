@@ -2,6 +2,7 @@ import os
 import shutil
 import zipfile
 import threading
+import gc
 import time
 import math
 from typing import List, Dict, Any, Optional
