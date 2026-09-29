@@ -9,7 +9,8 @@ if BASE_DIR not in sys.path:
 import shutil
 from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from modules.app import MindGateEngine
@@ -30,6 +31,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Static Files Setup for Browser Access
+UI_DIR = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=UI_DIR), name="static")
+
+# Root URL par Browser me Direct index.html Serve Hoga
+@app.get("/")
+async def serve_ui():
+    index_path = os.path.join(UI_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse(
+        content={"message": "MindGate AI API is running. index.html not found in ui folder."}, 
+        status_code=404
+    )
+
 
 # Global Manager Instances
 workspace_mgr = WorkspaceManager(base_dir="workspaces")
@@ -132,4 +149,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app_server:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("ui.app_server:app", host="127.0.0.1", port=8000, reload=True)
