@@ -105,3 +105,12 @@
 - Upgraded `modules/vector_db.py` with `StorageCompressor` class for automated background idle compression (`.mgdb` ZIP file) after 30 seconds of inactivity.
 - Enforced strict dynamic `file_name` metadata filtering in ChromaDB queries to prevent multi-document context pollution.
 - Updated `current_state.md` to track vector engine completion.
+
+# MindGate AI — Change Log
+
+## [v1.1.0-prod] - 2026-09-29
+
+### Added
+- Upgraded `modules/parser.py` with PyMuPDF Table Finder engine (`page.find_tables()`), converting structured tables directly into clean Markdown format.
+- Implemented Multi-Column layout sorting (Top-to-Bottom, Left-to-Right) to preserve context in complex document formats.
+- Updated `current_state.md` for Step 1 completion.
