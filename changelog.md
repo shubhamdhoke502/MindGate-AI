@@ -167,3 +167,9 @@
 - Added `/upload` endpoint for PDF ingestion per session.
 - Added `/chat` and `/chat/stream` SSE streaming endpoints.
 - Added `/system/flush` endpoint for dynamic RAM/VRAM resource management.
+
+# CHANGELOG - MindGate AI Engine
+
+## [1.8.2] - Dynamic Workspace Chat Logging
+### Modified
+- Updated `modules/chat_history.py` to dynamically accept `workspace_dir` to ensure chat logs stay isolated per user session.
