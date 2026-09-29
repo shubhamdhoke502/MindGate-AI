@@ -132,19 +132,37 @@ class StorageCompressor:
     def compress_db(self):
         if not os.path.exists(self.db_dir):
             return
+        
+        # 1. Python garbage collection clear garbage/open file handles
+        gc.collect()
+
         try:
+            # 2. Archive creation inside try block
             with zipfile.ZipFile(self.archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(self.db_dir):
                     for file in files:
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, self.db_dir)
+                        # Skip if attempting to zip archive into itself
+                        if os.path.abspath(full_path) == os.path.abspath(self.archive_path):
+                            continue
                         zipf.write(full_path, rel_path)
-            shutil.rmtree(self.db_dir)
-            os.makedirs(self.db_dir, exist_ok=True)
+            
+            # 3. Graceful deletion with lock exception handling
+            for root, dirs, files in os.walk(self.db_dir, topdown=False):
+                for file in files:
+                    file_p = os.path.join(root, file)
+                    if os.path.abspath(file_p) != os.path.abspath(self.archive_path):
+                        try:
+                            os.remove(file_p)
+                        except Exception:
+                            pass
+            
             self.is_compressed = True
             print("[StorageCompressor]: Vector DB auto-compressed to .mgdb archive.")
         except Exception as e:
-            print(f"[StorageCompressor Error]: Compression failed - {e}")
+            # Fallback handling for Windows File Lock
+            print(f"[StorageCompressor Warning]: Compression skipped due to active lock - {e}")
 
     def decompress_db(self):
         if not os.path.exists(self.archive_path):
@@ -153,7 +171,10 @@ class StorageCompressor:
         try:
             with zipfile.ZipFile(self.archive_path, 'r') as zipf:
                 zipf.extractall(self.db_dir)
-            os.remove(self.archive_path)
+            try:
+                os.remove(self.archive_path)
+            except Exception:
+                pass
             self.is_compressed = False
             print("[StorageCompressor]: Vector DB auto-restored from archive.")
         except Exception as e:
@@ -161,7 +182,6 @@ class StorageCompressor:
 
     def stop(self):
         self._stop_event.set()
-
 
 class VectorStoreManager:
     """
