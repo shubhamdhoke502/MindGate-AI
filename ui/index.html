@@ -3,29 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindGate AI — Local RAG Engine</title>
+    <title>MindGate AI</title>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --panel-bg: #1e293b;
-            --accent-color: #38bdf8;
-            --text-color: #f8fafc;
-            --muted-text: #94a3b8;
-            --border-color: #334155;
-            --user-msg-bg: #0284c7;
-            --bot-msg-bg: #334155;
+            --bg-primary: #212121;
+            --bg-sidebar: #171717;
+            --bg-input: #2f2f2f;
+            --bg-hover: #2f2f2f;
+            --text-primary: #ececec;
+            --text-secondary: #b4b4b4;
+            --border-color: #383838;
+            --accent: #0084ff;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             display: flex;
             height: 100vh;
             overflow: hidden;
@@ -33,227 +33,370 @@
 
         /* Sidebar UI */
         .sidebar {
-            width: 300px;
-            background-color: var(--panel-bg);
-            border-right: 1px solid var(--border-color);
+            width: 260px;
+            background-color: var(--bg-sidebar);
             display: flex;
             flex-direction: column;
-            padding: 20px;
-            gap: 20px;
+            padding: 12px;
+            transition: margin-left 0.3s ease;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 100;
         }
 
-        .brand-title {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: var(--accent-color);
+        .sidebar.collapsed {
+            margin-left: -260px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+        }
+
+        .new-chat-btn {
             display: flex;
             align-items: center;
             gap: 10px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.9rem;
+            transition: background 0.2s;
         }
 
-        .upload-zone {
-            border: 2px dashed var(--accent-color);
+        .new-chat-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .upload-section {
+            margin-top: 15px;
+            border: 1px dashed var(--border-color);
             border-radius: 8px;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
             cursor: pointer;
-            transition: background 0.3s;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
         }
 
-        .upload-zone:hover {
-            background-color: rgba(56, 189, 248, 0.1);
+        .upload-section:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
         }
 
         .file-list {
             flex-grow: 1;
             overflow-y: auto;
+            margin-top: 15px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .file-item {
-            background: var(--bg-color);
-            padding: 10px;
+            padding: 8px 12px;
             border-radius: 6px;
             font-size: 0.85rem;
-            border: 1px solid var(--border-color);
-            word-break: break-all;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.03);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .btn-flush {
-            background: #ef4444;
-            color: white;
-            border: none;
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
             padding: 10px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-weight: bold;
+            font-size: 0.85rem;
+            margin-top: auto;
+            transition: background 0.2s;
         }
 
         .btn-flush:hover {
-            background: #dc2626;
+            background: rgba(239, 68, 68, 0.25);
         }
 
-        /* Main Chat Window */
-        .chat-container {
+        /* Main Chat Area */
+        .main-content {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
             position: relative;
+            height: 100%;
+            background: var(--bg-primary);
         }
 
-        .chat-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--panel-bg);
+        .top-bar {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            padding: 12px 16px;
+            gap: 12px;
         }
 
-        .chat-box {
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+
+        .toggle-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .chat-scroll-area {
             flex-grow: 1;
-            padding: 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            align-items: center;
+            width: 100%;
         }
 
-        .message {
+        /* Hero Landing Center Screen */
+        .hero-container {
+            margin: auto;
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .hero-title {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .quick-chip {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .quick-chip:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Message Stream List */
+        .messages-list {
+            width: 100%;
+            max-width: 768px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            padding: 20px;
+        }
+
+        .message-row {
+            display: flex;
+            gap: 16px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .msg-bubble {
             max-width: 80%;
             padding: 12px 16px;
-            border-radius: 8px;
-            line-height: 1.5;
-            font-size: 0.95rem;
+            border-radius: 18px;
             white-space: pre-wrap;
+            word-break: break-word;
         }
 
-        .message.user {
-            align-self: flex-end;
-            background-color: var(--user-msg-bg);
-            color: white;
+        .message-row.user .msg-bubble {
+            background: #2f2f2f;
+            color: var(--text-primary);
+            border-bottom-right-radius: 4px;
         }
 
-        .message.assistant {
-            align-self: flex-start;
-            background-color: var(--bot-msg-bg);
-            border: 1px solid var(--border-color);
+        .message-row.assistant .msg-bubble {
+            background: transparent;
+            color: var(--text-primary);
+            padding-left: 0;
         }
 
         .citation-tag {
             display: inline-block;
-            background: #0ea5e9;
-            color: white;
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #334155;
             font-size: 0.75rem;
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
             margin-top: 8px;
             cursor: pointer;
-            text-decoration: none;
         }
 
-        /* Input Bar & Popup */
-        .input-wrapper {
-            padding: 20px;
-            background: var(--panel-bg);
-            border-top: 1px solid var(--border-color);
+        /* Floating Input Bar (ChatGPT Style) */
+        .input-container {
+            width: 100%;
+            max-width: 768px;
+            margin: 0 auto 24px auto;
+            padding: 0 20px;
             position: relative;
         }
 
-        .input-form {
-            display: flex;
-            gap: 10px;
-        }
-
-        .chat-input {
-            flex-grow: 1;
-            padding: 12px;
-            border-radius: 6px;
+        .input-box-wrapper {
+            background: var(--bg-input);
             border: 1px solid var(--border-color);
-            background: var(--bg-color);
-            color: var(--text-color);
-            outline: none;
+            border-radius: 24px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            transition: border-color 0.2s;
         }
 
-        .btn-send {
-            background: var(--accent-color);
-            color: #0f172a;
+        .input-box-wrapper:focus-within {
+            border-color: #666;
+        }
+
+        .chat-textarea {
+            flex-grow: 1;
+            background: transparent;
             border: none;
-            padding: 0 20px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            resize: none;
+            max-height: 200px;
+            min-height: 24px;
+            line-height: 24px;
         }
 
-        /* Memory Recall Popup */
+        .btn-send-chat {
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            transition: opacity 0.2s;
+        }
+
+        .btn-send-chat:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        /* Mention Popup */
         .at-popup {
             position: absolute;
-            bottom: 75px;
+            bottom: 70px;
             left: 20px;
-            width: 300px;
-            background: var(--panel-bg);
-            border: 1px solid var(--accent-color);
-            border-radius: 6px;
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
             display: none;
             flex-direction: column;
-            max-height: 150px;
-            overflow-y: auto;
+            width: 250px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             z-index: 10;
         }
 
         .at-item {
-            padding: 10px;
+            padding: 10px 14px;
             cursor: pointer;
             font-size: 0.85rem;
-            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
         }
 
         .at-item:hover {
-            background: var(--bg-color);
+            background: var(--bg-hover);
         }
     </style>
 </head>
 <body>
 
-    <!-- Sidebar UI -->
-    <div class="sidebar">
-        <div class="brand-title">
-            ⚡ MindGate AI
-        </div>
+    <!-- Collapsible Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <button class="new-chat-btn" onclick="location.reload()">
+            <span>✏️</span> New chat
+        </button>
 
-        <div class="upload-zone" id="uploadZone">
-            📁 Drag & Drop PDF here<br>
-            <span style="font-size: 0.75rem; color: var(--muted-text);">or click to select</span>
+        <div class="upload-section" id="uploadZone">
+            📁 Upload PDF Document
             <input type="file" id="fileInput" accept=".pdf" style="display: none;">
         </div>
 
-        <div style="font-weight: bold; font-size: 0.9rem;">Uploaded Documents</div>
         <div class="file-list" id="fileList"></div>
 
         <button class="btn-flush" onclick="flushMemory()">🧹 Flush RAM / VRAM</button>
     </div>
 
-    <!-- Main Chat Window -->
-    <div class="chat-container">
-        <div class="chat-header">
-            <div><strong>Active Workspace:</strong> <span id="wsDisplay">default_session</span></div>
-            <div style="font-size: 0.85rem; color: var(--muted-text);" id="statusIndicator">🟢 Engine Ready</div>
+    <!-- Main Chat Workspace -->
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+            <span style="font-size: 0.9rem; color: var(--text-secondary);" id="statusIndicator">MindGate AI Engine</span>
         </div>
 
-        <div class="chat-box" id="chatBox"></div>
-
-        <!-- Input Wrapper & @ Command Popup -->
-        <div class="input-wrapper">
-            <div class="at-popup" id="atPopup">
-                <div class="at-item" onclick="insertAtCommand('@memory.json')">🧠 @ Recall Memory Box</div>
+        <div class="chat-scroll-area" id="scrollArea">
+            <!-- Initial Hero Landing -->
+            <div class="hero-container" id="heroContainer">
+                <div class="hero-title">What can I help with today?</div>
+                <div class="quick-actions">
+                    <div class="quick-chip" onclick="insertAtCommand('@memory.json')">🧠 Recall Memory</div>
+                    <div class="quick-chip" onclick="document.getElementById('fileInput').click()">📄 Summarize Document</div>
+                </div>
             </div>
 
-            <form class="input-form" id="chatForm">
-                <input type="text" class="chat-input" id="userInput" placeholder="Ask anything about your document... (Use '@' for memory recall)" autocomplete="off">
-                <button type="submit" class="btn-send">Send</button>
-            </form>
+            <!-- Active Messages List -->
+            <div class="messages-list" id="messagesList" style="display: none;"></div>
+        </div>
+
+        <!-- Floating Input Bar -->
+        <div class="input-container">
+            <div class="at-popup" id="atPopup">
+                <div class="at-item" onclick="insertAtCommand('@memory.json')">🧠 @memory.json (Recall Memory)</div>
+            </div>
+
+            <div class="input-box-wrapper">
+                <textarea class="chat-textarea" id="userInput" rows="1" placeholder="Ask MindGate AI... (Use '@' for memory)"></textarea>
+                <button class="btn-send-chat" id="sendBtn" onclick="handleChatSubmit()">↑</button>
+            </div>
         </div>
     </div>
 
@@ -261,12 +404,14 @@
         const API_BASE = "http://127.0.0.1:8000";
         let activeWorkspace = "default_session";
 
-        // Initial Load
         document.addEventListener("DOMContentLoaded", () => {
             initWorkspace();
-            loadChatHistory();
             setupEventListeners();
         });
+
+        function toggleSidebar() {
+            document.getElementById("sidebar").classList.toggle("collapsed");
+        }
 
         async function initWorkspace() {
             const formData = new FormData();
@@ -274,49 +419,36 @@
             await fetch(`${API_BASE}/workspace/init`, { method: "POST", body: formData });
         }
 
-        async function loadChatHistory() {
-            try {
-                const res = await fetch(`${API_BASE}/chat/history?workspace_id=${activeWorkspace}`);
-                const data = await res.json();
-                if (data.history) {
-                    data.history.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
-                }
-            } catch (err) {
-                console.error("Failed to load chat history:", err);
-            }
-        }
-
         function setupEventListeners() {
-            // Upload handlers
+            const textarea = document.getElementById("userInput");
             const uploadZone = document.getElementById("uploadZone");
             const fileInput = document.getElementById("fileInput");
 
-            uploadZone.addEventListener("click", () => fileInput.click());
-            fileInput.addEventListener("change", (e) => handleFileUpload(e.target.files[0]));
-
-            uploadZone.addEventListener("dragover", (e) => e.preventDefault());
-            uploadZone.addEventListener("drop", (e) => {
-                e.preventDefault();
-                if (e.dataTransfer.files.length) handleFileUpload(e.dataTransfer.files[0]);
-            });
-
-            // Chat input & @ trigger
-            const userInput = document.getElementById("userInput");
-            const atPopup = document.getElementById("atPopup");
-
-            userInput.addEventListener("input", (e) => {
-                if (e.target.value.endsWith("@")) {
-                    atPopup.style.display = "flex";
+            // Auto-expanding textarea height
+            textarea.addEventListener("input", function() {
+                this.style.height = "auto";
+                this.style.height = (this.scrollHeight) + "px";
+                
+                if (this.value.endsWith("@")) {
+                    document.getElementById("atPopup").style.display = "flex";
                 } else {
-                    atPopup.style.display = "none";
+                    document.getElementById("atPopup").style.display = "none";
                 }
             });
 
-            document.getElementById("chatForm").addEventListener("submit", handleChatSubmit);
+            textarea.addEventListener("keydown", function(e) {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleChatSubmit();
+                }
+            });
+
+            uploadZone.addEventListener("click", () => fileInput.click());
+            fileInput.addEventListener("change", (e) => handleFileUpload(e.target.files[0]));
         }
 
         async function handleFileUpload(file) {
-            if (!file || !file.name.endsWith(".pdf")) return alert("Only PDF files allowed!");
+            if (!file || !file.name.endsWith(".pdf")) return alert("Please select a PDF file!");
 
             const status = document.getElementById("statusIndicator");
             status.innerText = "⏳ Ingesting PDF...";
@@ -333,8 +465,7 @@
                     status.innerText = "🟢 PDF Indexed";
                 }
             } catch (err) {
-                alert("Upload failed!");
-                status.innerText = "🔴 Engine Error";
+                status.innerText = "🔴 Upload Failed";
             }
         }
 
@@ -346,18 +477,22 @@
             list.appendChild(item);
         }
 
-        async function handleChatSubmit(e) {
-            e.preventDefault();
-            const input = document.getElementById("userInput");
-            const query = input.value.trim();
+        async function handleChatSubmit() {
+            const textarea = document.getElementById("userInput");
+            const query = textarea.value.trim();
             if (!query) return;
 
+            // Hide Hero, Show Messages List
+            document.getElementById("heroContainer").style.display = "none";
+            const messagesList = document.getElementById("messagesList");
+            messagesList.style.display = "flex";
+
             appendMessage("user", query);
-            input.value = "";
+            textarea.value = "";
+            textarea.style.height = "auto";
             document.getElementById("atPopup").style.display = "none";
 
-            // Create Assistant Empty Message Bubble for SSE Streaming
-            const botMsgDiv = appendMessage("assistant", "");
+            const botBubble = appendMessage("assistant", "");
 
             try {
                 const response = await fetch(`${API_BASE}/chat/stream`, {
@@ -373,39 +508,36 @@
                     const { done, value } = await reader.read();
                     if (done) break;
                     const chunk = decoder.decode(value);
-                    botMsgDiv.innerText += chunk;
-                    document.getElementById("chatBox").scrollTop = document.getElementById("chatBox").scrollHeight;
+                    botBubble.innerText += chunk;
+                    document.getElementById("scrollArea").scrollTop = document.getElementById("scrollArea").scrollHeight;
                 }
             } catch (err) {
-                botMsgDiv.innerText = "Error streaming response.";
+                botBubble.innerText = "Error streaming response.";
             }
         }
 
-        function appendMessage(role, text, citations = []) {
-            const chatBox = document.getElementById("chatBox");
-            const msg = document.createElement("div");
-            msg.className = `message ${role}`;
-            msg.innerText = text;
+        function appendMessage(role, text) {
+            const messagesList = document.getElementById("messagesList");
+            const row = document.createElement("div");
+            row.className = `message-row ${role}`;
 
-            if (citations && citations.length > 0) {
-                citations.forEach(c => {
-                    const tag = document.createElement("a");
-                    tag.className = "citation-tag";
-                    tag.innerText = `📍 Source: ${c.doc} | Page ${c.page}, Lines ${c.lines}`;
-                    msg.appendChild(tag);
-                });
-            }
+            const bubble = document.createElement("div");
+            bubble.className = "msg-bubble";
+            bubble.innerText = text;
 
-            chatBox.appendChild(msg);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return msg;
+            row.appendChild(bubble);
+            messagesList.appendChild(row);
+
+            const scrollArea = document.getElementById("scrollArea");
+            scrollArea.scrollTop = scrollArea.scrollHeight;
+            return bubble;
         }
 
         function insertAtCommand(cmd) {
-            const input = document.getElementById("userInput");
-            input.value += cmd;
+            const textarea = document.getElementById("userInput");
+            textarea.value += cmd;
             document.getElementById("atPopup").style.display = "none";
-            input.focus();
+            textarea.focus();
         }
 
         async function flushMemory() {
