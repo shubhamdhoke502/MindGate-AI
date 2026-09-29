@@ -20,12 +20,12 @@
 
         /* Chat History Box */
         #chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-        .msg { max-width: 85%; padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.5; }
+        .msg { max-width: 85%; padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
         .msg.user { align-self: flex-end; background: #0284c7; color: white; border-bottom-right-radius: 2px; }
         .msg.assistant { align-self: flex-start; background: #334155; color: #f8fafc; border-bottom-left-radius: 2px; }
 
         /* Citation Badge */
-        .citation-btn { display: inline-block; margin-top: 8px; background: #0ea5e9; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; text-decoration: none; border: none; font-weight: 600; }
+        .citation-btn { display: inline-block; margin-top: 8px; margin-right: 6px; background: #0ea5e9; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; text-decoration: none; border: none; font-weight: 600; }
         .citation-btn:hover { background: #38bdf8; }
 
         /* Input Controls */
@@ -48,7 +48,7 @@
     <!-- Left Panel: Chat Interface -->
     <div id="left-chat-panel">
         <div class="panel-header">
-            <h2>MindGate AI — Engine Workspace</h2>
+            <h2>MindGate AI — Workspace</h2>
             <input type="file" id="pdf-uploader" accept=".pdf" style="display:none;" onchange="uploadPDF()">
             <button onclick="document.getElementById('pdf-uploader').click()">+ Upload PDF</button>
         </div>
@@ -82,10 +82,14 @@
 
         // Load Chat History on App Start
         window.onload = async () => {
-            const res = await fetch('/api/history');
-            const data = await res.json();
-            if (data.history) {
-                data.history.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+                if (data.history) {
+                    data.history.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
+                }
+            } catch (err) {
+                console.log("No previous history loaded.");
             }
         };
 
@@ -96,12 +100,12 @@
             div.innerText = text;
 
             if (citations && citations.length > 0) {
+                div.appendChild(document.createElement('br'));
                 citations.forEach(c => {
                     const btn = document.createElement('button');
                     btn.className = "citation-btn";
                     btn.innerText = `📄 ${c.file_name} | Page ${c.page} (Lines ${c.lines})`;
                     btn.onclick = () => renderPDFPage(c.file_name, c.page);
-                    div.appendChild(document.createElement('br'));
                     div.appendChild(btn);
                 });
             }
@@ -135,14 +139,56 @@
             appendMessage('user', query);
             input.value = '';
 
-            const res = await fetch('/api/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: query, active_pdf: activePdfName || null })
-            });
+            // Create placeholder for streaming assistant response
+            const chatBox = document.getElementById('chat-messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'msg assistant';
+            chatBox.appendChild(msgDiv);
 
-            const data = await res.json();
-            appendMessage('assistant', data.answer, data.citations);
+            try {
+                const response = await fetch('/api/ask_stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, active_pdf: activePdfName || null })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let assistantText = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.replace('data: ', ''));
+                            if (data.type === 'chunk') {
+                                assistantText += data.token;
+                                msgDiv.innerText = assistantText;
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            } else if (data.type === 'end' && data.citations) {
+                                // Append citations once generation finishes
+                                if (data.citations.length > 0) {
+                                    msgDiv.appendChild(document.createElement('br'));
+                                    data.citations.forEach(c => {
+                                        const btn = document.createElement('button');
+                                        btn.className = "citation-btn";
+                                        btn.innerText = `📄 ${c.file_name} | Page ${c.page} (Lines ${c.lines})`;
+                                        btn.onclick = () => renderPDFPage(c.file_name, c.page);
+                                        msgDiv.appendChild(btn);
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                msgDiv.innerText = "Error streaming response from server.";
+            }
         }
 
         async function renderPDFPage(fileName, pageNum) {
