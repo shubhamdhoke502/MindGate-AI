@@ -1,19 +1,20 @@
 import os
 import json
-from typing import List, Dict
+from typing import List, Dict, Optional
+
 
 class ChatHistoryManager:
     """
-    Manages local persistent chat logs.
-    Saves and loads chat sessions from .mindgate/chat_history.json.
+    Manages local persistent chat logs per workspace session.
+    Saves and loads chat sessions dynamically.
     """
-    def __init__(self, storage_dir: str = None):
-        if storage_dir is None:
+    def __init__(self, workspace_dir: Optional[str] = None):
+        if workspace_dir is None:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            storage_dir = os.path.join(base_dir, "storage", ".mindgate")
+            workspace_dir = os.path.join(base_dir, "workspaces", "default_session")
         
-        os.makedirs(storage_dir, exist_ok=True)
-        self.history_file = os.path.join(storage_dir, "chat_history.json")
+        os.makedirs(workspace_dir, exist_ok=True)
+        self.history_file = os.path.join(workspace_dir, "chat_history.json")
         self._ensure_file_exists()
 
     def _ensure_file_exists(self):
@@ -34,7 +35,7 @@ class ChatHistoryManager:
             json.dump(history, f, indent=2, ensure_ascii=False)
 
     def get_all_messages(self) -> List[Dict]:
-        """Loads all historical messages."""
+        """Loads all historical messages for the active workspace."""
         try:
             with open(self.history_file, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -42,6 +43,6 @@ class ChatHistoryManager:
             return []
 
     def clear_history(self):
-        """Clears the chat history log."""
+        """Clears the chat history log for the active workspace."""
         with open(self.history_file, "w", encoding="utf-8") as f:
             json.dump([], f)
