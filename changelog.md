@@ -132,3 +132,28 @@
 - Integrated Server-Sent Events (SSE) streaming endpoint `/api/ask_stream` in `ui/app_server.py`.
 - Added generator-based token streaming (`ask_stream`) in `modules/app.py`.
 - Implemented stream buffer decoder in `ui/index.html` for typewriter-style real-time token rendering.
+
+# CHANGELOG - MindGate AI Engine
+
+## [1.5.0] - Step 5: Multi-Tenancy Workspace & Session Isolation
+### Added
+- **`modules/workspace.py`**: Added `WorkspaceManager` class for session-based workspace directory creation and lifecycle management.
+- Dynamic project structure initialization (`create_project_structure`) for isolated storage per user session.
+- System directory cleanup and path safety using cross-platform `pathlib.Path`.
+
+## [1.4.0] - Step 4: Resource Management & Memory Control
+### Added
+- Integrated `SystemResourceManager` into `MindGateEngine`.
+- Configured automatic RAM garbage collection with `self.resource_mgr.flush_memory()` at the end of both `ask()` and `ask_stream()` methods.
+
+## [1.3.0] - Step 3: SSE Streaming Engine
+### Added
+- Real-time token streaming (`ask_stream`) via Server-Sent Events (SSE) using Ollama local instance.
+
+## [1.2.0] - Step 2: RRF Hybrid Search Engine
+### Added
+- Combined BM25 lexical search with ChromaDB dense vector search using Reciprocal Rank Fusion.
+
+## [1.1.0] - Step 1: Layout-Aware Parser
+### Added
+- Production-grade PyMuPDF parser (`parser.py`) for extracting text, table structures, and bounding box coordinates.
