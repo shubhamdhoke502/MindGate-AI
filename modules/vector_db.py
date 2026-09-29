@@ -3,20 +3,109 @@ import shutil
 import zipfile
 import threading
 import time
+import math
 from typing import List, Dict, Any, Optional
+from collections import Counter
 
 try:
     import chromadb
-    from chromadb.config import Settings
 except ImportError:
     chromadb = None
 
 
+class BM25SearchEngine:
+    """
+    In-Memory BM25 (Sparse Keyword Search) Engine.
+    Used alongside Vector DB to ensure exact keyword, serial number, and numeric accuracy.
+    """
+    def __init__(self, k1: float = 1.5, b: float = 0.75):
+        self.k1 = k1
+        self.b = b
+        self.doc_ids: List[str] = []
+        self.doc_metadatas: List[Dict[str, Any]] = []
+        self.corpus: List[List[str]] = []
+        self.doc_len: List[int] = []
+        self.avgdl: float = 0.0
+        self.doc_freqs: List[Dict[str, int]] = []
+        self.idf: Dict[str, float] = {}
+        self.total_docs: int = 0
+
+    def tokenize(self, text: str) -> List[str]:
+        """Simple lowercase tokenization."""
+        return text.lower().split()
+
+    def index_documents(self, chunks: List[Dict[str, Any]]):
+        """Indexes chunks for keyword-based retrieval."""
+        self.doc_ids = []
+        self.doc_metadatas = []
+        self.corpus = []
+        self.doc_len = []
+        self.doc_freqs = []
+        df_counter = Counter()
+
+        for chunk in chunks:
+            tokens = self.tokenize(chunk["text"])
+            self.corpus.append(tokens)
+            self.doc_ids.append(chunk["chunk_id"])
+            self.doc_metadatas.append(chunk["metadata"])
+            self.doc_len.append(len(tokens))
+
+            freqs = Counter(tokens)
+            self.doc_freqs.append(freqs)
+            for word in freqs.keys():
+                df_counter[word] += 1
+
+        self.total_docs = len(self.corpus)
+        self.avgdl = sum(self.doc_len) / self.total_docs if self.total_docs > 0 else 0.0
+
+        # Calculate IDF values
+        self.idf = {}
+        for word, freq in df_counter.items():
+            self.idf[word] = math.log((self.total_docs - freq + 0.5) / (freq + 0.5) + 1.0)
+
+    def search(self, query: str, top_k: int = 5, file_name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Executes BM25 keyword matching with file metadata filtering."""
+        if self.total_docs == 0:
+            return []
+
+        query_tokens = self.tokenize(query)
+        scores = []
+
+        for idx, tokens in enumerate(self.corpus):
+            # Apply file isolation filter
+            if file_name_filter and self.doc_metadatas[idx].get("file_name") != file_name_filter:
+                continue
+
+            score = 0.0
+            doc_len = self.doc_len[idx]
+            freqs = self.doc_freqs[idx]
+
+            for token in query_tokens:
+                if token in freqs:
+                    freq = freqs[token]
+                    idf = self.idf.get(token, 0.0)
+                    numerator = idf * freq * (self.k1 + 1)
+                    denominator = freq + self.k1 * (1 - self.b + self.b * (doc_len / self.avgdl))
+                    score += numerator / denominator
+
+            if score > 0:
+                scores.append((score, idx))
+
+        scores.sort(key=lambda x: x[0], reverse=True)
+        results = []
+        for score, idx in scores[:top_k]:
+            results.append({
+                "chunk_id": self.doc_ids[idx],
+                "text": " ".join(self.corpus[idx]),
+                "metadata": self.doc_metadatas[idx],
+                "score": round(score, 4),
+                "source": "bm25"
+            })
+        return results
+
+
 class StorageCompressor:
-    """
-    Manages background idle compression of ChromaDB vector files
-    to save up to 80% local disk storage footprint (.mgdb ZIP format).
-    """
+    """Manages background idle compression of ChromaDB vector files (.mgdb ZIP format)."""
     def __init__(self, db_dir: str, archive_path: str, idle_threshold_sec: int = 30):
         self.db_dir = db_dir
         self.archive_path = archive_path
@@ -28,13 +117,11 @@ class StorageCompressor:
         self._worker_thread.start()
 
     def register_activity(self):
-        """Resets the idle timer on active user interaction."""
         self.last_activity_time = time.time()
         if self.is_compressed:
             self.decompress_db()
 
     def _idle_monitor_loop(self):
-        """Monitors system activity and compresses DB when idle."""
         while not self._stop_event.is_set():
             time.sleep(5)
             idle_duration = time.time() - self.last_activity_time
@@ -43,10 +130,8 @@ class StorageCompressor:
                     self.compress_db()
 
     def compress_db(self):
-        """Compresses ChromaDB folder into .mgdb ZIP archive."""
         if not os.path.exists(self.db_dir):
             return
-        
         try:
             with zipfile.ZipFile(self.archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(self.db_dir):
@@ -54,27 +139,23 @@ class StorageCompressor:
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, self.db_dir)
                         zipf.write(full_path, rel_path)
-            
             shutil.rmtree(self.db_dir)
             os.makedirs(self.db_dir, exist_ok=True)
             self.is_compressed = True
-            print("[StorageCompressor]: Vector DB successfully compressed to .mgdb archive.")
+            print("[StorageCompressor]: Vector DB auto-compressed to .mgdb archive.")
         except Exception as e:
             print(f"[StorageCompressor Error]: Compression failed - {e}")
 
     def decompress_db(self):
-        """Restores ChromaDB folder from .mgdb ZIP archive."""
         if not os.path.exists(self.archive_path):
             self.is_compressed = False
             return
-        
         try:
             with zipfile.ZipFile(self.archive_path, 'r') as zipf:
                 zipf.extractall(self.db_dir)
-            
             os.remove(self.archive_path)
             self.is_compressed = False
-            print("[StorageCompressor]: Vector DB restored from .mgdb archive.")
+            print("[StorageCompressor]: Vector DB auto-restored from archive.")
         except Exception as e:
             print(f"[StorageCompressor Error]: Decompression failed - {e}")
 
@@ -84,8 +165,8 @@ class StorageCompressor:
 
 class VectorStoreManager:
     """
-    Manages persistent ChromaDB vector storage with strict dynamic metadata filters.
-    Supports isolation per document name and background ZIP compression.
+    Production Hybrid Vector Engine: Combines Dense Vector DB (ChromaDB)
+    with Sparse Keyword Search (BM25) using Reciprocal Rank Fusion (RRF).
     """
     def __init__(self, storage_dir: str = None):
         if storage_dir is None:
@@ -97,13 +178,13 @@ class VectorStoreManager:
         os.makedirs(self.db_dir, exist_ok=True)
 
         self.compressor = StorageCompressor(self.db_dir, self.archive_path)
+        self.bm25_engine = BM25SearchEngine()
         self._client = None
         self._collection = None
+        self._indexed_chunks = []
 
     def _get_collection(self):
-        """Ensures DB is uncompressed and returns active Chroma collection."""
         self.compressor.register_activity()
-        
         if self._client is None or self.compressor.is_compressed:
             if chromadb:
                 self._client = chromadb.PersistentClient(path=self.db_dir)
@@ -114,7 +195,7 @@ class VectorStoreManager:
         return self._collection
 
     def add_chunks(self, chunks: List[Dict[str, Any]]):
-        """Adds text chunks with metadata (page, lines, bbox) into ChromaDB."""
+        """Indexes chunks into both ChromaDB (Vector) and BM25 (Keyword Engine)."""
         collection = self._get_collection()
         if not collection or not chunks:
             return
@@ -125,60 +206,72 @@ class VectorStoreManager:
 
         for chunk in chunks:
             documents.append(chunk["text"])
-            # Flat metadata for ChromaDB compatibility
             meta = chunk["metadata"].copy()
-            meta["bbox"] = str(meta["bbox"])  # Store bbox list as string representation
+            meta["bbox"] = str(meta["bbox"])
             metadatas.append(meta)
             ids.append(chunk["chunk_id"])
 
-        collection.upsert(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids
-        )
+        collection.upsert(documents=documents, metadatas=metadatas, ids=ids)
+        
+        # Index in BM25 Sparse Search Engine
+        self._indexed_chunks.extend(chunks)
+        self.bm25_engine.index_documents(self._indexed_chunks)
 
     def query_similar_chunks(self, query: str, top_k: int = 2, file_name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Retrieves top_k relevant chunks with strict file_name namespace filter.
-        Prevents cross-contamination between different uploaded PDFs.
+        Executes Hybrid Retrieval (Vector + BM25) fused via Reciprocal Rank Fusion (RRF).
         """
         collection = self._get_collection()
         if not collection:
             return []
 
-        where_clause = None
-        if file_name_filter:
-            where_clause = {"file_name": file_name_filter}
-
-        results = collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where_clause
-        )
-
-        formatted_results = []
-        if results and "documents" in results and results["documents"]:
-            docs = results["documents"][0]
-            metas = results["metadatas"][0]
-            distances = results.get("distances", [[]])[0]
-
+        # 1. Vector Search Results
+        where_clause = {"file_name": file_name_filter} if file_name_filter else None
+        vector_res = collection.query(query_texts=[query], n_results=top_k * 2, where=where_clause)
+        
+        vector_chunks = []
+        if vector_res and "documents" in vector_res and vector_res["documents"]:
+            docs = vector_res["documents"][0]
+            metas = vector_res["metadatas"][0]
+            ids = vector_res["ids"][0]
             for i in range(len(docs)):
                 meta = metas[i].copy()
-                # Restore bbox back to array
                 if isinstance(meta.get("bbox"), str):
                     try:
                         meta["bbox"] = eval(meta["bbox"])
                     except Exception:
                         pass
-
-                formatted_results.append({
+                vector_chunks.append({
+                    "chunk_id": ids[i],
                     "text": docs[i],
                     "metadata": meta,
-                    "score": distances[i] if i < len(distances) else 0.0
+                    "source": "vector"
                 })
 
-        return formatted_results
+        # 2. BM25 Keyword Search Results
+        bm25_chunks = self.bm25_engine.search(query, top_k=top_k * 2, file_name_filter=file_name_filter)
+
+        # 3. Reciprocal Rank Fusion (RRF) Logic
+        rrf_scores = {}
+        chunk_map = {}
+        rrf_k = 60
+
+        for rank, chunk in enumerate(vector_chunks):
+            cid = chunk["chunk_id"]
+            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (1.0 / (rrf_k + rank + 1))
+            chunk_map[cid] = chunk
+
+        for rank, chunk in enumerate(bm25_chunks):
+            cid = chunk["chunk_id"]
+            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (1.0 / (rrf_k + rank + 1))
+            chunk_map[cid] = chunk
+
+        # Sort combined results by fusion score
+        sorted_cids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+        final_results = [chunk_map[cid] for cid in sorted_cids[:top_k]]
+
+        return final_results
 
 
 if __name__ == "__main__":
-    print("[VectorDB Module]: Persistent Vector Store with Idle Compression & Strict Filters Ready.")
+    print("[Production Hybrid VectorDB Engine]: Vector + BM25 Search Engine Ready.")
