@@ -3,213 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindGate AI — Workspace</title>
-    <!-- PDF.js Engine -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <title>MindGate AI — Local RAG Engine</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        body { display: flex; height: 100vh; background-color: #0f172a; color: #f8fafc; overflow: hidden; }
-        
-        /* Layout Panels */
-        #left-chat-panel { width: 50%; display: flex; flex-direction: column; border-right: 1px solid #334155; }
-        #right-pdf-panel { width: 50%; display: flex; flex-direction: column; background: #1e293b; position: relative; }
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --text-color: #f8fafc;
+            --muted-text: #94a3b8;
+            --border-color: #334155;
+            --user-msg-bg: #0284c7;
+            --bot-msg-bg: #334155;
+        }
 
-        /* Headers */
-        .panel-header { padding: 12px 20px; background: #1e293b; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-        .panel-header h2 { font-size: 16px; color: #38bdf8; font-weight: 600; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
 
-        /* Chat History Box */
-        #chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-        .msg { max-width: 85%; padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
-        .msg.user { align-self: flex-end; background: #0284c7; color: white; border-bottom-right-radius: 2px; }
-        .msg.assistant { align-self: flex-start; background: #334155; color: #f8fafc; border-bottom-left-radius: 2px; }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
 
-        /* Citation Badge */
-        .citation-btn { display: inline-block; margin-top: 8px; margin-right: 6px; background: #0ea5e9; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; text-decoration: none; border: none; font-weight: 600; }
-        .citation-btn:hover { background: #38bdf8; }
+        /* Sidebar UI */
+        .sidebar {
+            width: 300px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+        }
 
-        /* Input Controls */
-        .input-bar { padding: 14px; background: #1e293b; border-top: 1px solid #334155; display: flex; gap: 10px; }
-        input[type="text"] { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 6px; outline: none; }
-        button { padding: 10px 18px; background: #0284c7; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: 600; }
-        button:hover { background: #0369a1; }
+        .brand-title {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-        /* PDF Viewer Container */
-        #pdf-viewer-container { flex: 1; overflow: auto; position: relative; padding: 20px; display: flex; justify-content: center; }
-        #canvas-wrapper { position: relative; display: inline-block; }
-        canvas { border: 1px solid #475569; background: #ffffff; }
+        .upload-zone {
+            border: 2px dashed var(--accent-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
 
-        /* Highlighting Box */
-        .highlight-box { position: absolute; background: rgba(250, 204, 21, 0.4); border: 2px solid #eab308; pointer-events: none; transition: all 0.2s ease-in-out; }
+        .upload-zone:hover {
+            background-color: rgba(56, 189, 248, 0.1);
+        }
+
+        .file-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-item {
+            background: var(--bg-color);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid var(--border-color);
+            word-break: break-all;
+        }
+
+        .btn-flush {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-flush:hover {
+            background: #dc2626;
+        }
+
+        /* Main Chat Window */
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-box {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            white-space: pre-wrap;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            color: white;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background-color: var(--bot-msg-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .citation-tag {
+            display: inline-block;
+            background: #0ea5e9;
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 8px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* Input Bar & Popup */
+        .input-wrapper {
+            padding: 20px;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .input-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex-grow: 1;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-color);
+            color: var(--text-color);
+            outline: none;
+        }
+
+        .btn-send {
+            background: var(--accent-color);
+            color: #0f172a;
+            border: none;
+            padding: 0 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Memory Recall Popup */
+        .at-popup {
+            position: absolute;
+            bottom: 75px;
+            left: 20px;
+            width: 300px;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-color);
+            border-radius: 6px;
+            display: none;
+            flex-direction: column;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .at-item {
+            padding: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .at-item:hover {
+            background: var(--bg-color);
+        }
     </style>
 </head>
 <body>
 
-    <!-- Left Panel: Chat Interface -->
-    <div id="left-chat-panel">
-        <div class="panel-header">
-            <h2>MindGate AI — Workspace</h2>
-            <input type="file" id="pdf-uploader" accept=".pdf" style="display:none;" onchange="uploadPDF()">
-            <button onclick="document.getElementById('pdf-uploader').click()">+ Upload PDF</button>
+    <!-- Sidebar UI -->
+    <div class="sidebar">
+        <div class="brand-title">
+            ⚡ MindGate AI
         </div>
-        <div id="chat-messages"></div>
-        <div class="input-bar">
-            <input type="text" id="user-input" placeholder="Ask question or use @ to recall context..." onkeypress="if(event.key==='Enter') sendQuery()">
-            <button onclick="sendQuery()">Send</button>
+
+        <div class="upload-zone" id="uploadZone">
+            📁 Drag & Drop PDF here<br>
+            <span style="font-size: 0.75rem; color: var(--muted-text);">or click to select</span>
+            <input type="file" id="fileInput" accept=".pdf" style="display: none;">
         </div>
+
+        <div style="font-weight: bold; font-size: 0.9rem;">Uploaded Documents</div>
+        <div class="file-list" id="fileList"></div>
+
+        <button class="btn-flush" onclick="flushMemory()">🧹 Flush RAM / VRAM</button>
     </div>
 
-    <!-- Right Panel: Side-by-Side PDF Viewer -->
-    <div id="right-pdf-panel">
-        <div class="panel-header">
-            <h2 id="pdf-title">PDF Document Viewer</h2>
-            <span id="page-indicator" style="font-size:12px; color:#94a3b8;">No Document Loaded</span>
+    <!-- Main Chat Window -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <div><strong>Active Workspace:</strong> <span id="wsDisplay">default_session</span></div>
+            <div style="font-size: 0.85rem; color: var(--muted-text);" id="statusIndicator">🟢 Engine Ready</div>
         </div>
-        <div id="pdf-viewer-container">
-            <div id="canvas-wrapper">
-                <canvas id="pdf-canvas"></canvas>
-                <div id="highlight-layer"></div>
+
+        <div class="chat-box" id="chatBox"></div>
+
+        <!-- Input Wrapper & @ Command Popup -->
+        <div class="input-wrapper">
+            <div class="at-popup" id="atPopup">
+                <div class="at-item" onclick="insertAtCommand('@memory.json')">🧠 @ Recall Memory Box</div>
             </div>
+
+            <form class="input-form" id="chatForm">
+                <input type="text" class="chat-input" id="userInput" placeholder="Ask anything about your document... (Use '@' for memory recall)" autocomplete="off">
+                <button type="submit" class="btn-send">Send</button>
+            </form>
         </div>
     </div>
 
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-        
-        let activePdfName = "";
-        let pdfDoc = null;
-        let scale = 1.2;
+        const API_BASE = "http://127.0.0.1:8000";
+        let activeWorkspace = "default_session";
 
-        // Load Chat History on App Start
-        window.onload = async () => {
+        // Initial Load
+        document.addEventListener("DOMContentLoaded", () => {
+            initWorkspace();
+            loadChatHistory();
+            setupEventListeners();
+        });
+
+        async function initWorkspace() {
+            const formData = new FormData();
+            formData.append("workspace_id", activeWorkspace);
+            await fetch(`${API_BASE}/workspace/init`, { method: "POST", body: formData });
+        }
+
+        async function loadChatHistory() {
             try {
-                const res = await fetch('/api/history');
+                const res = await fetch(`${API_BASE}/chat/history?workspace_id=${activeWorkspace}`);
                 const data = await res.json();
                 if (data.history) {
                     data.history.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
                 }
             } catch (err) {
-                console.log("No previous history loaded.");
+                console.error("Failed to load chat history:", err);
             }
-        };
-
-        function appendMessage(role, text, citations = []) {
-            const chatBox = document.getElementById('chat-messages');
-            const div = document.createElement('div');
-            div.className = `msg ${role}`;
-            div.innerText = text;
-
-            if (citations && citations.length > 0) {
-                div.appendChild(document.createElement('br'));
-                citations.forEach(c => {
-                    const btn = document.createElement('button');
-                    btn.className = "citation-btn";
-                    btn.innerText = `📄 ${c.file_name} | Page ${c.page} (Lines ${c.lines})`;
-                    btn.onclick = () => renderPDFPage(c.file_name, c.page);
-                    div.appendChild(btn);
-                });
-            }
-
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        async function uploadPDF() {
-            const fileInput = document.getElementById('pdf-uploader');
-            if (!fileInput.files[0]) return;
+        function setupEventListeners() {
+            // Upload handlers
+            const uploadZone = document.getElementById("uploadZone");
+            const fileInput = document.getElementById("fileInput");
+
+            uploadZone.addEventListener("click", () => fileInput.click());
+            fileInput.addEventListener("change", (e) => handleFileUpload(e.target.files[0]));
+
+            uploadZone.addEventListener("dragover", (e) => e.preventDefault());
+            uploadZone.addEventListener("drop", (e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files.length) handleFileUpload(e.dataTransfer.files[0]);
+            });
+
+            // Chat input & @ trigger
+            const userInput = document.getElementById("userInput");
+            const atPopup = document.getElementById("atPopup");
+
+            userInput.addEventListener("input", (e) => {
+                if (e.target.value.endsWith("@")) {
+                    atPopup.style.display = "flex";
+                } else {
+                    atPopup.style.display = "none";
+                }
+            });
+
+            document.getElementById("chatForm").addEventListener("submit", handleChatSubmit);
+        }
+
+        async function handleFileUpload(file) {
+            if (!file || !file.name.endsWith(".pdf")) return alert("Only PDF files allowed!");
+
+            const status = document.getElementById("statusIndicator");
+            status.innerText = "⏳ Ingesting PDF...";
 
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append("file", file);
+            formData.append("workspace_id", activeWorkspace);
 
-            const res = await fetch('/api/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            
-            if (data.status === 'success') {
-                activePdfName = data.file_name;
-                alert(`Uploaded and Ingested: ${data.file_name}`);
-                renderPDFPage(activePdfName, 1);
+            try {
+                const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.status === "success") {
+                    addFileToList(file.name);
+                    status.innerText = "🟢 PDF Indexed";
+                }
+            } catch (err) {
+                alert("Upload failed!");
+                status.innerText = "🔴 Engine Error";
             }
         }
 
-        async function sendQuery() {
-            const input = document.getElementById('user-input');
+        function addFileToList(fileName) {
+            const list = document.getElementById("fileList");
+            const item = document.createElement("div");
+            item.className = "file-item";
+            item.innerText = `📄 ${fileName}`;
+            list.appendChild(item);
+        }
+
+        async function handleChatSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById("userInput");
             const query = input.value.trim();
             if (!query) return;
 
-            appendMessage('user', query);
-            input.value = '';
+            appendMessage("user", query);
+            input.value = "";
+            document.getElementById("atPopup").style.display = "none";
 
-            // Create placeholder for streaming assistant response
-            const chatBox = document.getElementById('chat-messages');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'msg assistant';
-            chatBox.appendChild(msgDiv);
+            // Create Assistant Empty Message Bubble for SSE Streaming
+            const botMsgDiv = appendMessage("assistant", "");
 
             try {
-                const response = await fetch('/api/ask_stream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: query, active_pdf: activePdfName || null })
+                const response = await fetch(`${API_BASE}/chat/stream`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: query, workspace_id: activeWorkspace })
                 });
 
                 const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let assistantText = "";
+                const decoder = new TextDecoder("utf-8");
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-
-                    const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk.split('\n\n');
-
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = JSON.parse(line.replace('data: ', ''));
-                            if (data.type === 'chunk') {
-                                assistantText += data.token;
-                                msgDiv.innerText = assistantText;
-                                chatBox.scrollTop = chatBox.scrollHeight;
-                            } else if (data.type === 'end' && data.citations) {
-                                // Append citations once generation finishes
-                                if (data.citations.length > 0) {
-                                    msgDiv.appendChild(document.createElement('br'));
-                                    data.citations.forEach(c => {
-                                        const btn = document.createElement('button');
-                                        btn.className = "citation-btn";
-                                        btn.innerText = `📄 ${c.file_name} | Page ${c.page} (Lines ${c.lines})`;
-                                        btn.onclick = () => renderPDFPage(c.file_name, c.page);
-                                        msgDiv.appendChild(btn);
-                                    });
-                                }
-                            }
-                        }
-                    }
+                    const chunk = decoder.decode(value);
+                    botMsgDiv.innerText += chunk;
+                    document.getElementById("chatBox").scrollTop = document.getElementById("chatBox").scrollHeight;
                 }
             } catch (err) {
-                msgDiv.innerText = "Error streaming response from server.";
+                botMsgDiv.innerText = "Error streaming response.";
             }
         }
 
-        async function renderPDFPage(fileName, pageNum) {
-            activePdfName = fileName;
-            document.getElementById('pdf-title').innerText = fileName;
-            document.getElementById('page-indicator').innerText = `Page ${pageNum}`;
+        function appendMessage(role, text, citations = []) {
+            const chatBox = document.getElementById("chatBox");
+            const msg = document.createElement("div");
+            msg.className = `message ${role}`;
+            msg.innerText = text;
 
-            const url = `/pdf_files/${fileName}`;
-            if (!pdfDoc || pdfDoc._transport.filename !== url) {
-                pdfDoc = await pdfjsLib.getDocument(url).promise;
+            if (citations && citations.length > 0) {
+                citations.forEach(c => {
+                    const tag = document.createElement("a");
+                    tag.className = "citation-tag";
+                    tag.innerText = `📍 Source: ${c.doc} | Page ${c.page}, Lines ${c.lines}`;
+                    msg.appendChild(tag);
+                });
             }
 
-            const page = await pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({ scale: scale });
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return msg;
+        }
 
-            const canvas = document.getElementById('pdf-canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+        function insertAtCommand(cmd) {
+            const input = document.getElementById("userInput");
+            input.value += cmd;
+            document.getElementById("atPopup").style.display = "none";
+            input.focus();
+        }
 
-            await page.render({ canvasContext: context, viewport: viewport }).promise;
+        async function flushMemory() {
+            await fetch(`${API_BASE}/system/flush`, { method: "POST" });
+            alert("System RAM & VRAM flushed successfully!");
         }
     </script>
 </body>
