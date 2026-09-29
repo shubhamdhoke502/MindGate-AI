@@ -114,3 +114,12 @@
 - Upgraded `modules/parser.py` with PyMuPDF Table Finder engine (`page.find_tables()`), converting structured tables directly into clean Markdown format.
 - Implemented Multi-Column layout sorting (Top-to-Bottom, Left-to-Right) to preserve context in complex document formats.
 - Updated `current_state.md` for Step 1 completion.
+
+# MindGate AI — Change Log
+
+## [v1.2.0-prod] - 2026-09-29
+
+### Added
+- Integrated BM25 Sparse Keyword Search Engine (`BM25SearchEngine`) in `modules/vector_db.py`.
+- Implemented Reciprocal Rank Fusion (RRF) algorithm to merge dense vector embeddings with sparse keyword search scores, fixing exact numeric and serial number search misses.
+- Updated `current_state.md` for Step 2 completion.

@@ -1,11 +1,11 @@
 # MindGate AI — Current Project State
 
-* **Active Phase:** Step 1: Deep Production-Grade Parser Hardening
-* **Current Status:** Rebuilt `modules/parser.py` with dynamic Table Matrix Extraction (Markdown conversion), Layout Block Sorting (Multi-Column support), and Scanned PDF image detection.
+* **Active Phase:** Step 2: Deep Hybrid Search Hardening
+* **Current Status:** Upgraded `modules/vector_db.py` with In-Memory BM25 Sparse Search Engine and Reciprocal Rank Fusion (RRF) combining ChromaDB dense vector results.
 * **Completed Production Modules:**
   - [x] Step 1: `modules/parser.py` (Production Table & Layout-Aware Parser with Devnagari NFC Cleaning)
+  - [x] Step 2: `modules/vector_db.py` (Production Hybrid Engine: BM25 Keyword + ChromaDB Vector + RRF Fusion)
 * **Pending Deep Production Steps:**
-  - [ ] Step 2: Hybrid Search Engine in `modules/vector_db.py` (BM25 Keyword Search + ChromaDB Vector Search)
-  - [ ] Step 3: SSE Real-Time Token Streaming in `ui/app_server.py` and `modules/app.py`
-  - [ ] Step 4: SLM GGUF Quantization & RAM Guardrails Manager
-* **Next Action Item:** Implement Step 2 (Hybrid Search BM25 + Vector Engine).
+  - [ ] Step 3: SSE Real-Time Token Streaming Engine in `modules/app.py` and `ui/app_server.py`
+  - [ ] Step 4: Local SLM Quantization, RAM Guardrails & Memory Cleanup Manager
+* **Next Action Item:** Implement Step 3 (SSE Real-Time Token Streaming Engine).
