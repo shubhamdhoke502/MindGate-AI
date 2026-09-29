@@ -2,7 +2,7 @@ import json
 import urllib.request
 from typing import Dict, Any, List, Optional
 
-from modules.parser import parse_pdf_with_coordinates
+from modules.parser import parse_pdf_production_grade as parse_pdf_with_coordinates
 from modules.vector_db import VectorStoreManager, StorageCompressor
 from modules.container import ContainerMemoryManager
 from modules.chat_history import ChatHistoryManager
