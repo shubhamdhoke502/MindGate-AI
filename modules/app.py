@@ -7,6 +7,7 @@ from vector_db import VectorStoreManager, StorageCompressor
 from container import ContainerMemoryManager
 from chat_history import ChatHistoryManager
 from chunk_cache import ChunkCacheManager
+from modules.resource_manager import SystemResourceManager
 
 class MindGateEngine:
     def __init__(self, ollama_model: str = "phi3:mini", ollama_host: str = "http://localhost:11434"):
@@ -20,6 +21,7 @@ class MindGateEngine:
         self.container_memory = ContainerMemoryManager()
         self.chat_history = ChatHistoryManager()
         self.chunk_cache = ChunkCacheManager()
+        self.resource_mgr = SystemResourceManager()
 
     def ingest_document(self, pdf_path: str) -> Dict[str, Any]:
         """
@@ -85,6 +87,7 @@ class MindGateEngine:
         if not retrieved_chunks:
             fallback_ans = "Document me is topic par koi reliable info nahi mili."
             self.chat_history.save_message(role="assistant", content=fallback_ans)
+            self.resource_mgr.flush_memory()
             return {"answer": fallback_ans, "citations": []}
 
         # 3. Prepare Context & Citations Metadata
@@ -119,7 +122,7 @@ class MindGateEngine:
         # 6. Save Assistant Response with Citations in Chat History
         self.chat_history.save_message(role="assistant", content=slm_response, citations=citations)
 
-        # 7. Background Sync into Container Memory Box
+        # 7. Background Sync into Container Memory Boxx
         if citations:
             top_meta = citations[0]
             self.container_memory.save_highlight(
@@ -128,6 +131,9 @@ class MindGateEngine:
                 line_range=top_meta["lines"],
                 key_fact=slm_response[:120] + "..."
             )
+
+        # 8. Flush RAM Memory
+        self.resource_mgr.flush_memory()
 
         return {
             "answer": slm_response,

@@ -21,7 +21,7 @@ class SystemResourceManager:
             "used_percent": mem.percent
         }
 
-    def recommend_model_quantization(() -> Dict[str, str]:
+    def recommend_model_quantization(self) -> Dict[str, str]:
         """
         Determines safest model quantization based on available RAM guardrails.
         """
