@@ -1,0 +1,18 @@
+# Web Framework & Server
+fastapi==0.110.0
+uvicorn==0.28.0
+python-multipart==0.0.9
+pydantic==2.6.4
+
+# PDF Parsing & Extraction Engine
+PyMuPDF==1.23.26
+
+# Vector Store & Search Engines
+chromadb==0.4.24
+sentence-transformers==2.5.1
+rank-bm25==0.2.2
+
+# LLM Orchestration & Utilities
+requests==2.31.0
+numpy==1.26.4
+pathlib
