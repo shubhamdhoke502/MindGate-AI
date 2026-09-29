@@ -1,0 +1,650 @@
+[
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c1",
+    "text": "📑 Software Requirement Specification (SRS)\nProject Name: Gateway OTP (Next-Generation Smart OTP Verification Gateway)\n1. Project Overview & Objective\nGateway OTP is a highly scalable, production-ready, and cost-effective multi-channel One-Time Password\n(OTP) Verification Gateway backend engine. The core system architecture is custom-tailored for AI-driven\n\"Vibe Coding\" methodologies and rapid micro-caching standards.",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        42.52,
+        62.49,
+        552.76,
+        235.67
+      ],
+      "has_table": false,
+      "character_count": 420
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c5",
+    "text": "(OTP) Verification Gateway backend engine. The core system architecture is custom-tailored for AI-driven\n\"Vibe Coding\" methodologies and rapid micro-caching standards.\nCore Objective: To completely eliminate infrastructure delivery and communication overhead costs for early-\nstage startups and small-to-medium software teams. Gateway OTP features a dynamic cost-optimization\nrouting layer that evaluates channel availability and operational thresholds in real-time to dispatch security\ntokens via the most cost-efficient medium possible (WhatsApp $ ightarrow$ Email $ ightarrow$ Fallback",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        42.52,
+        207.15,
+        552.84,
+        311.87
+      ],
+      "has_table": false,
+      "character_count": 588
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c9",
+    "text": "routing layer that evaluates channel availability and operational thresholds in real-time to dispatch security\ntokens via the most cost-efficient medium possible (WhatsApp $ ightarrow$ Email $ ightarrow$ Fallback\nSMS).\n2. Core Architectural Features\n•\nCryptographically Secure Token Generation: The system rejects pseudo-random generators (such as",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 9,
+      "line_end": 14,
+      "bbox": [
+        42.52,
+        283.35,
+        552.67,
+        395.62
+      ],
+      "has_table": false,
+      "character_count": 347
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c13",
+    "text": "•\nCryptographically Secure Token Generation: The system rejects pseudo-random generators (such as\nMath.random() ) due to vulnerability against predictability and guessing attacks. Instead, it utilizes the\nnative Node.js crypto module to generate unguessable, high-entropy 6-digit numeric verification tokens.\n•\nSmart Auto-Switching Routing Engine: Implements a cascading waterfall routing mechanism based on",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 13,
+      "line_end": 18,
+      "bbox": [
+        50.93,
+        383.9,
+        548.86,
+        450.39
+      ],
+      "has_table": false,
+      "character_count": 407
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c17",
+    "text": "•\nSmart Auto-Switching Routing Engine: Implements a cascading waterfall routing mechanism based on\ncost-efficiency thresholds:\n◦\nPriority 1 (Primary): Meta WhatsApp Cloud API — Utilizes the monthly free tier allowance (1,000\nuser-initiated conversations). System defaults all routing here initially.",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 17,
+      "line_end": 22,
+      "bbox": [
+        50.93,
+        438.67,
+        546.65,
+        500.79
+      ],
+      "has_table": false,
+      "character_count": 299
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c21",
+    "text": "Priority 1 (Primary): Meta WhatsApp Cloud API — Utilizes the monthly free tier allowance (1,000\nuser-initiated conversations). System defaults all routing here initially.\n◦\nPriority 2 (Secondary Fallback): Resend / Brevo Transactional Email APIs — Automatically shifts\ntraffic to the email channel if WhatsApp thresholds are exhausted or connection drops occur (3,000+\nfree monthly emails allowance).",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 21,
+      "line_end": 26,
+      "bbox": [
+        65.88,
+        472.27,
+        542.46,
+        554.94
+      ],
+      "has_table": false,
+      "character_count": 400
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c25",
+    "text": "traffic to the email channel if WhatsApp thresholds are exhausted or connection drops occur (3,000+\nfree monthly emails allowance).\n◦\nPriority 3 (Tertiary Fallback): Third-Party SMS Gateway — Integrates client-configured telecom\nnodes strictly as a final fallback layer if telecom billing balances are active; otherwise, exceptions are\ncaught gracefully.",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 25,
+      "line_end": 30,
+      "bbox": [
+        65.88,
+        526.42,
+        538.78,
+        609.09
+      ],
+      "has_table": false,
+      "character_count": 354
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c29",
+    "text": "nodes strictly as a final fallback layer if telecom billing balances are active; otherwise, exceptions are\ncaught gracefully.\n•\nDynamic Micro-Caching Layer: To eliminate heavy database lookup overheads and disk write\nbottlenecks, the engine stores volatile operational tokens inside an in-memory cache. All dynamic OTP\ntokens are bound to a strict Time-To-Live (TTL) expiry window of exactly 300 seconds (5 minutes).",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 29,
+      "line_end": 34,
+      "bbox": [
+        50.93,
+        580.57,
+        538.78,
+        670.74
+      ],
+      "has_table": false,
+      "character_count": 416
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c33",
+    "text": "bottlenecks, the engine stores volatile operational tokens inside an in-memory cache. All dynamic OTP\ntokens are bound to a strict Time-To-Live (TTL) expiry window of exactly 300 seconds (5 minutes).\n•\nAnti-Brute Force Protection (Rate Limiting): Restricts malicious iteration attacks against a single\nidentifier (phone number or email) by enforcing a maximum cap of 3 consecutive failed validation\nattempts. Exceeding this cap places the target identifier/IP into a temporary lock down cooldown state for",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 33,
+      "line_end": 38,
+      "bbox": [
+        50.93,
+        642.22,
+        550.47,
+        724.89
+      ],
+      "has_table": false,
+      "character_count": 505
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p1_c37",
+    "text": "identifier (phone number or email) by enforcing a maximum cap of 3 consecutive failed validation\nattempts. Exceeding this cap places the target identifier/IP into a temporary lock down cooldown state for\n15 minutes.\nGateway OTP — SRS Specification v1.0\n1",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 1,
+      "line_start": 37,
+      "line_end": 40,
+      "bbox": [
+        42.52,
+        696.37,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 254
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c1",
+    "text": "•\nAnti-Spam Resend Guardrail: To mitigate API payload exhaustion and prevent resource billing spam\nloops, a strict resource lock prevents a generic client from requesting a new token for the same identifier\nwithin 60 seconds of the last successful dispatch.\n3. Tech Stack & Infrastructure Design\n•",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        50.93,
+        59.23,
+        540.72,
+        171.5
+      ],
+      "has_table": false,
+      "character_count": 297
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c5",
+    "text": "3. Tech Stack & Infrastructure Design\n•\nBackend Runtime: Node.js environment utilizing a clean, asynchronous JavaScript execution context\ndriven by the Express.js application framework.\n•\nState Management & Caching: Redis cache layer. Standalone standalone Redis for local development,",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        50.93,
+        129.23,
+        543.04,
+        208.85
+      ],
+      "has_table": false,
+      "character_count": 285
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c9",
+    "text": "•\nState Management & Caching: Redis cache layer. Standalone standalone Redis for local development,\nand serverless distributed Upstash Redis for production/staging environments.\n•\nCloud Deployment: Managed via Render.com Web Service architecture utilizing an automated CI/CD\ndeployment pipeline synced directly to the target GitHub repository branch.",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 9,
+      "line_end": 14,
+      "bbox": [
+        50.93,
+        197.13,
+        543.04,
+        263.31
+      ],
+      "has_table": false,
+      "character_count": 350
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c13",
+    "text": "Cloud Deployment: Managed via Render.com Web Service architecture utilizing an automated CI/CD\ndeployment pipeline synced directly to the target GitHub repository branch.\n4. Database Cache Schema (Redis Key-Value Models)\nTo guarantee microsecond verification lookups, the cache layers must use the following clean, predictable\nKey-Value design structures:\nA. Active Token Verification Matrix",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 13,
+      "line_end": 18,
+      "bbox": [
+        42.52,
+        234.79,
+        552.64,
+        378.72
+      ],
+      "has_table": false,
+      "character_count": 391
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c17",
+    "text": "Key-Value design structures:\nA. Active Token Verification Matrix\n•\nKey Design Pattern: auth:otp:[CountryCode][PhoneNumber]\n•\nData Structure Type: Stringified JSON Map / Hash Matrix",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 17,
+      "line_end": 22,
+      "bbox": [
+        42.52,
+        335.34,
+        362.71,
+        422.62
+      ],
+      "has_table": false,
+      "character_count": 180
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c21",
+    "text": "•\nData Structure Type: Stringified JSON Map / Hash Matrix\n•\nAllocation Lifecycle: Automatically drops via native Redis TTL engine set to exactly 300 seconds.\n\"auth:otp:919876543210\": {\n\"otp\": \"584291\",",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 21,
+      "line_end": 26,
+      "bbox": [
+        50.93,
+        410.9,
+        515.64,
+        494.89
+      ],
+      "has_table": false,
+      "character_count": 201
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c25",
+    "text": "\"auth:otp:919876543210\": {\n\"otp\": \"584291\",\n\"attempts\": 0,\n\"createdAt\": 1783647291\n}\nB. Client Request Cool-Down State Lock",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 25,
+      "line_end": 30,
+      "bbox": [
+        42.52,
+        468.94,
+        262.96,
+        581.58
+      ],
+      "has_table": false,
+      "character_count": 123
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c29",
+    "text": "}\nB. Client Request Cool-Down State Lock\n•\nKey Design Pattern: auth:cooldown:[CountryCode][PhoneNumber]\n•\nData Structure Type: String Binary Bit Flag",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 29,
+      "line_end": 34,
+      "bbox": [
+        42.52,
+        529.74,
+        391.21,
+        625.48
+      ],
+      "has_table": false,
+      "character_count": 149
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c33",
+    "text": "•\nData Structure Type: String Binary Bit Flag\n•\nAllocation Lifecycle: Automatically drops via native Redis TTL engine set to exactly 60 seconds.\n\"auth:cooldown:919876543210\": \"active\"\nGateway OTP — SRS Specification v1.0\n2",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 33,
+      "line_end": 38,
+      "bbox": [
+        42.52,
+        613.77,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 222
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p2_c37",
+    "text": "\"auth:cooldown:919876543210\": \"active\"\nGateway OTP — SRS Specification v1.0\n2",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 2,
+      "line_start": 37,
+      "line_end": 38,
+      "bbox": [
+        42.52,
+        671.8,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 77
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c1",
+    "text": "5. REST API Endpoints Specification\n📥 API Endpoint 1: Dispatch Verification Code (Send OTP)\nRoute HTTP Verb: POST /api/v1/otp/send\nTransport Headers: Content-Type: application/json\nExpected Payload Body:\n{",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        42.52,
+        60.08,
+        359.94,
+        218.3
+      ],
+      "has_table": false,
+      "character_count": 205
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c5",
+    "text": "Expected Payload Body:\n{\n\"phoneNumber\": \"919876543210\",\n\"email\": \"user@example.com\",\n\"channelPreference\": \"smart\"\n}",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        42.52,
+        171.81,
+        236.92,
+        279.1
+      ],
+      "has_table": false,
+      "character_count": 115
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c9",
+    "text": "\"channelPreference\": \"smart\"\n}\nExpected Success Response Structure (200 OK):\n{\n\"success\": true,\n\"message\": \"OTP dispatched successfully via WhatsApp.\",",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 9,
+      "line_end": 14,
+      "bbox": [
+        42.52,
+        253.15,
+        379.42,
+        381.75
+      ],
+      "has_table": false,
+      "character_count": 151
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c13",
+    "text": "\"success\": true,\n\"message\": \"OTP dispatched successfully via WhatsApp.\",\n\"requestId\": \"req_849201\"\n}\n📤 API Endpoint 2: Evaluate Verification Token (Verify OTP)\nRoute HTTP Verb: POST /api/v1/otp/verify",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 13,
+      "line_end": 18,
+      "bbox": [
+        42.52,
+        355.8,
+        379.42,
+        476.97
+      ],
+      "has_table": false,
+      "character_count": 200
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c17",
+    "text": "📤 API Endpoint 2: Evaluate Verification Token (Verify OTP)\nRoute HTTP Verb: POST /api/v1/otp/verify\nTransport Headers: Content-Type: application/json\nExpected Payload Body:\n{\n\"phoneNumber\": \"919876543210\",",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 17,
+      "line_end": 22,
+      "bbox": [
+        42.52,
+        440.4,
+        366.15,
+        578.53
+      ],
+      "has_table": false,
+      "character_count": 205
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c21",
+    "text": "{\n\"phoneNumber\": \"919876543210\",\n\"userOtp\": \"584291\"\n}\nExpected Identity Match Verification Response (200 OK):\n{",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 21,
+      "line_end": 26,
+      "bbox": [
+        42.52,
+        552.58,
+        324.93,
+        681.18
+      ],
+      "has_table": false,
+      "character_count": 112
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c25",
+    "text": "Expected Identity Match Verification Response (200 OK):\n{\n\"success\": true,\n\"message\": \"OTP verification successful. Access granted.\"\n}\nExpected Exception Failure Response (400 Bad Request):",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 25,
+      "line_end": 30,
+      "bbox": [
+        42.52,
+        634.69,
+        390.82,
+        764.26
+      ],
+      "has_table": false,
+      "character_count": 189
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p3_c29",
+    "text": "}\nExpected Exception Failure Response (400 Bad Request):\nGateway OTP — SRS Specification v1.0\n3",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 3,
+      "line_start": 29,
+      "line_end": 31,
+      "bbox": [
+        42.52,
+        716.03,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 95
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p4_c1",
+    "text": "{\n\"success\": false,\n\"message\": \"Invalid OTP. 2 attempts remaining.\"\n}\n6. System Execution Workflows & Logical Fail-Safe Streams\n[Incoming User Request to /api/v1/otp/send]\n │\n ▼\n [Query Redis Cool-down Key Status]\n │\n ┌───────────┴───────────┐\n ▼ (Key Exists) ▼ (Key Missing / Null)\nReturn HTTP 429 Error [Execute Native Crypto Engine]\n\"Wait 60 Seconds\" [Generate Secure 6-Digit OTP]\n │\n ▼\n [Evaluate Multi-Channel Routing]\n │\n [Try Meta WhatsApp Cloud Node]\n │\n ┌───────────────────────┴───────────────────────┐\n ▼ (Success Response) ▼ (Error / Threshold Hit)\n Cache Token State [Route to Backup Email Service Node]\n │\n ┌───────────────────────┴───────────────────────┐\n ▼ (Success Response) ▼ (Failure E\n Cache Token State Drop Request / Return\n │\n ▼\n [Write Core Cache State to Redis]\n [Apply Strict Key Directive: TTL = 300s]",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 4,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        51.52,
+        68.67,
+        555.97,
+        537.39
+      ],
+      "has_table": false,
+      "character_count": 829
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p4_c5",
+    "text": "6. System Execution Workflows & Logical Fail-Safe Streams\n[Incoming User Request to /api/v1/otp/send]\n │\n ▼\n [Query Redis Cool-down Key Status]\n │\n ┌───────────┴───────────┐\n ▼ (Key Exists) ▼ (Key Missing / Null)\nReturn HTTP 429 Error [Execute Native Crypto Engine]\n\"Wait 60 Seconds\" [Generate Secure 6-Digit OTP]\n │\n ▼\n [Evaluate Multi-Channel Routing]\n │\n [Try Meta WhatsApp Cloud Node]\n │\n ┌───────────────────────┴───────────────────────┐\n ▼ (Success Response) ▼ (Error / Threshold Hit)\n Cache Token State [Route to Backup Email Service Node]\n │\n ┌───────────────────────┴───────────────────────┐\n ▼ (Success Response) ▼ (Failure E\n Cache Token State Drop Request / Return\n │\n ▼\n [Write Core Cache State to Redis]\n [Apply Strict Key Directive: TTL = 300s]\n7. Action Plan for Automated Cursor AI Code Generation\n1.\nOpen your system terminal and create your root project directory:\nmkdir GatewayOTP-Backend && cd GatewayOTP-Backend",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 4,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        45.85,
+        159.13,
+        555.97,
+        644.28
+      ],
+      "has_table": false,
+      "character_count": 933
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p4_c9",
+    "text": "Open your system terminal and create your root project directory:\nmkdir GatewayOTP-Backend && cd GatewayOTP-Backend\n2.\nInitialize your clean Node Package Manager environment mapping:\nnpm init -y\n3.",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 4,
+      "line_start": 9,
+      "line_end": 14,
+      "bbox": [
+        45.85,
+        615.13,
+        369.74,
+        702.17
+      ],
+      "has_table": false,
+      "character_count": 197
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p4_c13",
+    "text": "npm init -y\n3.\nInject the exact required application dependencies directly into your workspace node module:\nnpm install express redis dotenv crypto\n4.\nCreate your main runtime backend execution index point file:",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 4,
+      "line_start": 13,
+      "line_end": 18,
+      "bbox": [
+        45.85,
+        671.19,
+        489.97,
+        739.83
+      ],
+      "has_table": false,
+      "character_count": 211
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p4_c17",
+    "text": "4.\nCreate your main runtime backend execution index point file:\ntouch server.js\nGateway OTP — SRS Specification v1.0\n4",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 4,
+      "line_start": 17,
+      "line_end": 20,
+      "bbox": [
+        42.52,
+        728.12,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 118
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p5_c1",
+    "text": "5.\nOpen your Cursor AI editor, highlight your empty server.js file, hit Ctrl + K (or open the Composer/\nChat window Panel), copy-paste this rewritten SRS document along with the explicit instruction below, and\nwatch the AI write it flawlessly:\n\"As per the complete, professional Software Requirement Specification (SRS) provided above for the\n'Gateway OTP' system, write the absolute, production-grade, modular, and highly secure Node.js Express",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 5,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        45.85,
+        59.23,
+        550.64,
+        155.26
+      ],
+      "has_table": false,
+      "character_count": 445
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p5_c5",
+    "text": "\"As per the complete, professional Software Requirement Specification (SRS) provided above for the\n'Gateway OTP' system, write the absolute, production-grade, modular, and highly secure Node.js Express\napplication source code in server.js. Implement the full Redis-backed multi-channel smart routing logic,\nexpress route endpoints, error handling, rate-limiting counters, and cool-down lock implementations.\nInclude clean, informative inline comments detailing the core caching operations and fail-safe streams.\"\nGateway OTP — SRS Specification v1.0\n5",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 5,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        42.52,
+        126.74,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 551
+    }
+  },
+  {
+    "chunk_id": "Gateway_OTP_Specification.pdf_p5_c9",
+    "text": "Include clean, informative inline comments detailing the core caching operations and fail-safe streams.\"\nGateway OTP — SRS Specification v1.0\n5",
+    "metadata": {
+      "file_name": "Gateway_OTP_Specification.pdf",
+      "page_number": 5,
+      "line_start": 9,
+      "line_end": 10,
+      "bbox": [
+        42.52,
+        193.94,
+        552.75,
+        818.56
+      ],
+      "has_table": false,
+      "character_count": 143
+    }
+  }
+]

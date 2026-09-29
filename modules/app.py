@@ -1,22 +1,23 @@
 import json
+import os
 import urllib.request
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Generator
 
+# Production-grade imports
 from modules.parser import parse_pdf_production_grade as parse_pdf_with_coordinates
-from modules.vector_db import VectorStoreManager, StorageCompressor
+from modules.vector_db import VectorStoreManager
 from modules.container import ContainerMemoryManager
 from modules.chat_history import ChatHistoryManager
 from modules.chunk_cache import ChunkCacheManager
 from modules.resource_manager import SystemResourceManager
 
+
 class MindGateEngine:
-    def __init__(self, ollama_model: str = "phi3:mini", ollama_host: str = "http://localhost:11434"):
-        """
-        Main Engine Orchestrator for MindGate AI.
-        Connects Parser, Vector DB, Container Box, Chat History, Chunk Cache, and Local SLM.
-        """
-        self.ollama_model = ollama_model
+    def __init__(self, ollama_host: str = "http://127.0.0.1:11434", ollama_model: str = "phi3:mini"):
         self.ollama_host = ollama_host
+        self.ollama_model = ollama_model
+        
+        # Initialize Core Managers
         self.vector_store = VectorStoreManager()
         self.container_memory = ContainerMemoryManager()
         self.chat_history = ChatHistoryManager()
@@ -25,39 +26,49 @@ class MindGateEngine:
 
     def ingest_document(self, pdf_path: str) -> Dict[str, Any]:
         """
-        Step 1: Activity Lock Register -> Step 2: Check Cache -> Step 3: Parse PDF -> Step 4: Store Vector DB -> Step 5: Register Container.
+        Step 1: Uncompress DB -> Step 2: Check Cache/Parse PDF -> Step 3: Index Chunks -> Step 4: Register Container.
         """
-        file_name = os.path.basename(pdf_path)
-        
-        # 0. Register activity to auto-decompress DB if idle-compressed
-        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
-            self.vector_store.compressor.register_activity()
+        try:
+            file_name = os.path.basename(pdf_path)
+            
+            # 0. Safety Lock Release
+            if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
+                self.vector_store.compressor.register_activity()
 
-        # 1. Check Disk Cache first
-        cached_chunks = self.chunk_cache.get_cached_chunks(pdf_path)
-        if cached_chunks:
-            chunks = cached_chunks
-        else:
-            # Parse fresh PDF and save to cache
-            chunks = parse_pdf_with_coordinates(pdf_path)
-            if chunks:
-                self.chunk_cache.save_chunks_to_cache(pdf_path, chunks)
-        
-        if not chunks:
-            return {"status": "error", "message": "No text extracted from PDF."}
+            # 1. Check Disk Cache first
+            cached_chunks = None
+            if hasattr(self.chunk_cache, 'get_cached_chunks'):
+                cached_chunks = self.chunk_cache.get_cached_chunks(pdf_path)
+            
+            if cached_chunks:
+                chunks = cached_chunks
+            else:
+                chunks = parse_pdf_with_coordinates(pdf_path)
+                if chunks and hasattr(self.chunk_cache, 'save_chunks_to_cache'):
+                    self.chunk_cache.save_chunks_to_cache(pdf_path, chunks)
+            
+            if not chunks:
+                return {"status": "error", "message": "No text extracted from PDF."}
 
-        # 2. Add Chunks to Local Vector DB
-        self.vector_store.add_chunks(chunks)
-        
-        # 3. Register in Memory Container
-        self.container_memory.register_document(file_name)
-        
-        return {
-            "status": "success",
-            "file_name": file_name,
-            "total_chunks_indexed": len(chunks),
-            "from_cache": cached_chunks is not None
-        }
+            # 2. Add Chunks to Local Vector DB safely
+            if hasattr(self.vector_store, 'add_chunks'):
+                self.vector_store.add_chunks(chunks)
+            elif hasattr(self.vector_store, 'add_documents'):
+                self.vector_store.add_documents(chunks)
+            
+            # 3. Register in Memory Container
+            if hasattr(self.container_memory, 'register_document'):
+                self.container_memory.register_document(file_name)
+            
+            return {
+                "status": "success",
+                "file_name": file_name,
+                "total_chunks_indexed": len(chunks),
+                "from_cache": cached_chunks is not None
+            }
+        except Exception as e:
+            print(f"\n[CRITICAL INGESTION ERROR]: {str(e)}\n")
+            raise Exception(f"Ingestion failed: {str(e)}")
 
     def _query_local_slm(self, prompt: str) -> str:
         """Sends grounded RAG prompt to local Ollama instance (100% Offline)."""
@@ -77,23 +88,19 @@ class MindGateEngine:
                 res = json.loads(response.read().decode("utf-8"))
                 return res.get("response", "").strip()
         except Exception as e:
-            return f"[Local SLM Error]: Ollama local instance run nahi ho raha hai. Please run 'ollama run {self.ollama_model}'. Details: {e}"
+            return f"[Local SLM Error]: Ollama local instance run nahi ho raha hai. Details: {e}"
 
     def ask(self, query: str, active_pdf: Optional[str] = None) -> Dict[str, Any]:
         """Performs Search, SLM Answer, Citation Generation, Container Sync, and Chat Saving."""
-        # Handle '@' Trigger Command
         if query.startswith("@"):
             search_term = query[1:]
             return self.container_memory.handle_at_trigger(search_term)
 
-        # 0. Decompress DB if needed
         if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
             self.vector_store.compressor.register_activity()
 
-        # 1. Save User Query in Chat History
         self.chat_history.save_message(role="user", content=query)
 
-        # 2. Retrieve Top-2 relevant chunks from Vector DB
         retrieved_chunks = self.vector_store.query_similar_chunks(query, top_k=2, file_name_filter=active_pdf)
         
         if not retrieved_chunks:
@@ -102,7 +109,6 @@ class MindGateEngine:
             self.resource_mgr.flush_memory()
             return {"answer": fallback_ans, "citations": []}
 
-        # 3. Prepare Context & Citations Metadata
         context_str = ""
         citations = []
         for idx, item in enumerate(retrieved_chunks):
@@ -122,25 +128,20 @@ class MindGateEngine:
                 "citation_text": citation_label
             })
 
-        # 4. Construct Grounded Prompt
         system_prompt = (
             "You are MindGate AI, a strict factual document assistant. "
             "Answer the user query ONLY using the provided context blocks. "
-            "Do NOT add conversational filler or unverified assumptions. "
-            "At the end of your answer, explicitly cite the source page and lines.\n\n"
+            "Do NOT add conversational filler or unverified assumptions.\n\n"
             f"DOCUMENT CONTEXT:\n{context_str}\n"
             f"USER QUERY: {query}\n\n"
             "ANSWER:"
         )
 
-        # 5. Generate Answer via Local SLM
         slm_response = self._query_local_slm(system_prompt)
 
-        # 6. Save Assistant Response with Citations in Chat History
         self.chat_history.save_message(role="assistant", content=slm_response, citations=citations)
 
-        # 7. Background Sync into Container Memory Box
-        if citations:
+        if citations and hasattr(self.container_memory, 'save_highlight'):
             top_meta = citations[0]
             self.container_memory.save_highlight(
                 pdf_name=top_meta["file_name"],
@@ -149,7 +150,6 @@ class MindGateEngine:
                 key_fact=slm_response[:120] + "..."
             )
 
-        # 8. Flush RAM Memory
         self.resource_mgr.flush_memory()
 
         return {
@@ -158,18 +158,11 @@ class MindGateEngine:
         }
 
     def ask_stream(self, query: str, active_pdf: Optional[str] = None) -> Generator[str, None, None]:
-        """Server-Sent Events (SSE) compatible streaming token response generator."""
+        """Server-Sent Events streaming generator."""
         res = self.ask(query, active_pdf)
         ans = res.get("answer", "")
-        # Stream response word by word for real-time streaming effect
         for word in ans.split(" "):
             yield f"data: {json.dumps({'token': word + ' '})}\n\n"
 
     def get_chat_history(self) -> List[Dict]:
-        """Returns all persistent chat messages."""
         return self.chat_history.get_all_messages()
-
-
-if __name__ == "__main__":
-    engine = MindGateEngine()
-    print("MindGate Core Engine with Persistent History & Cache Initialized Successfully.")

@@ -1,0 +1,272 @@
+[
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c1",
+    "text": "| AEROGUARD AI\nNext-Gen Zero-Trust Endpoint Security & Behavioral Analytics Engine\nDOCUMENT VERSION: 1.0 (V1 BLUEPRINT) | TARGET VALUATION (YEAR 1): ₹1 CRORE – ₹3\nCRORE | SECURITY LEVEL: ENTERPRISE GRADE |  |  |\n| --- | --- | --- |\n| Executive Summary: AeroGuard AI is a lightweight, zero-cloud endpoint security system engineered to safeguard\ncorporate assets against insider data theft, phone-camera leaks, and unauthorized station access. Operating at\nsystem-level hardware hooks with 0% cloud dependency, it delivers unbreakable compliance and continuous\nbiometric verification without degrading hardware performance. |  |  |\n|  |  |  |\n| 1. THE PROBLEM (ENTERPRISE SECURITY VULNERABILITIES) |  |  |\n| Modern enterprise endpoint defense solutions sufefr from critical architecture flaws that expose companies to millions of\ndollars in compliance fines and intellectual property theft:\n• High CPU & Cloud Dependency: Legacy tools like CrowdStrike or Symantec hog system resources, slowing down\nlow-to-mid range PCs while rendering protection useless when offline.\n• The \"Camera Leak\" Exploit: Employees routinely bypass software copy/paste blocks by taking photos of sensitive\nscreens via personal mobile devices—a loophole unaddressed by traditional firewalls.\n• Static Session Locks: Once an endpoint is unlocked, any physical intruder can exflitrate sensitive flies before\nautomated OS sleep triggers kick in. |  |  |\n| 2. THE AEROGUARD SOLUTION (CORE ARCHITECTURE PILLARS) |  |  |\n|  |  |  |\n| PILLAR | TECHNICAL MECHANISM | CORE ADVANTAGE |\n| Pillar 1: Keyboard\nRhythm Analytics | Tracks Keystroke Dynamics via Dwell\nTime (T ) & Flight Time (T) with\nd f\nmillisecond precision. | 100% Offline biometric identity verification.\nInstantly locks or flags session if rhythm match\ndrops below 85%. |\n| Pillar 2: Dynamic Stealth\nWatermark | Kernel/Graphics-level overlay displaying\ndynamic User ID, Local IP, & Date-Time\nwith crypto steganography. | Defeats phone camera leaks. Invisible\nencrypted micro-tags trace cropped screen\nphotos back to the perpetrator. |\n| Pillar 3: Zero-Knowledge\nVault | Sub-system local SQLite database\nsecured via AES-256 encryption using\nlocal Hardware Fingerprinting. | Zero master key leakage on cloud servers.\nHard disk extraction yields unreadable garbage\ndata. |\n|  |  |  |\n| 3. VERSION 1 (V1) SCOPE & TECHNICAL DELIVERABLES |  |  |\n| • Module 1 — Silent Keystroke Listener: Background listener utilizing system-level hooks to extract key-gap timing\nmatrices without recording actual key text (GDPR/Privacy Compliant).\n• Module 2 — Dynamic Screen Overlay: Lightweight Python/Win32 GUI layer rendering tamper-proof, semi-\ntransparent watermark metrics over active screen view. |  |  |\nAEROGUARD AI\nNext-Gen Zero-Trust Endpoint Security & Behavioral Analytics Engine\nDOCUMENT VERSION: 1.0 (V1 BLUEPRINT)  |  TARGET VALUATION (YEAR 1): ₹1 CRORE – ₹3\nCRORE  |  SECURITY LEVEL: ENTERPRISE GRADE\nExecutive Summary: AeroGuard AI is a lightweight, zero-cloud endpoint security system engineered to safeguard\ncorporate assets against insider data theft, phone-camera leaks, and unauthorized station access. Operating at\nsystem-level hardware hooks with 0% cloud dependency, it delivers unbreakable compliance and continuous\nbiometric verification without degrading hardware performance.\n1. THE PROBLEM (ENTERPRISE SECURITY VULNERABILITIES)",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        42.52,
+        42.85,
+        552.54,
+        790.87
+      ],
+      "has_table": true,
+      "character_count": 3366
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c5",
+    "text": "Executive Summary: AeroGuard AI is a lightweight, zero-cloud endpoint security system engineered to safeguard\ncorporate assets against insider data theft, phone-camera leaks, and unauthorized station access. Operating at\nsystem-level hardware hooks with 0% cloud dependency, it delivers unbreakable compliance and continuous\nbiometric verification without degrading hardware performance.\n1. THE PROBLEM (ENTERPRISE SECURITY VULNERABILITIES)\nModern enterprise endpoint defense solutions suffer from critical architecture flaws that expose companies to millions of\ndollars in compliance fines and intellectual property theft:\n•\nHigh CPU & Cloud Dependency: Legacy tools like CrowdStrike or Symantec hog system resources, slowing down\nlow-to-mid range PCs while rendering protection useless when offline.\n•",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        42.52,
+        192.49,
+        552.71,
+        386.49
+      ],
+      "has_table": false,
+      "character_count": 803
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c9",
+    "text": "High CPU & Cloud Dependency: Legacy tools like CrowdStrike or Symantec hog system resources, slowing down\nlow-to-mid range PCs while rendering protection useless when offline.\n•\nThe \"Camera Leak\" Exploit: Employees routinely bypass software copy/paste blocks by taking photos of sensitive\nscreens via personal mobile devices—a loophole unaddressed by traditional firewalls.\n•\nStatic Session Locks: Once an endpoint is unlocked, any physical intruder can exfiltrate sensitive files before\nautomated OS sleep triggers kick in.",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 9,
+      "line_end": 14,
+      "bbox": [
+        50.05,
+        343.99,
+        539.77,
+        433.74
+      ],
+      "has_table": false,
+      "character_count": 524
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c13",
+    "text": "•\nStatic Session Locks: Once an endpoint is unlocked, any physical intruder can exfiltrate sensitive files before\nautomated OS sleep triggers kick in.\n2. THE AEROGUARD SOLUTION (CORE ARCHITECTURE PILLARS)\nPILLAR\nTECHNICAL MECHANISM\nCORE ADVANTAGE\nPillar 1: Keyboard\nRhythm Analytics\nTracks Keystroke Dynamics via Dwell",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 13,
+      "line_end": 18,
+      "bbox": [
+        42.52,
+        409.99,
+        518.04,
+        544.86
+      ],
+      "has_table": false,
+      "character_count": 318
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c17",
+    "text": "Pillar 1: Keyboard\nRhythm Analytics\nTracks Keystroke Dynamics via Dwell\n100% Offline biometric identity verification.\nInstantly locks or flags session if rhythm match\ndrops below 85%.\nTime (Td) & Flight Time (Tf) with\nmillisecond precision.\nPillar 2: Dynamic Stealth\nWatermark",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 17,
+      "line_end": 22,
+      "bbox": [
+        50.77,
+        522.36,
+        541.46,
+        599.69
+      ],
+      "has_table": false,
+      "character_count": 276
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c21",
+    "text": "millisecond precision.\nPillar 2: Dynamic Stealth\nWatermark\nKernel/Graphics-level overlay displaying\ndynamic User ID, Local IP, & Date-Time\nwith crypto steganography.\nDefeats phone camera leaks. Invisible\nencrypted micro-tags trace cropped screen\nphotos back to the perpetrator.\nPillar 3: Zero-Knowledge\nVault\nSub-system local SQLite database\nsecured via AES-256 encryption using\nlocal Hardware Fingerprinting.",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 21,
+      "line_end": 26,
+      "bbox": [
+        50.77,
+        550.94,
+        527.23,
+        666.44
+      ],
+      "has_table": false,
+      "character_count": 409
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c25",
+    "text": "Pillar 3: Zero-Knowledge\nVault\nSub-system local SQLite database\nsecured via AES-256 encryption using\nlocal Hardware Fingerprinting.\nZero master key leakage on cloud servers.\nHard disk extraction yields unreadable garbage\ndata.\n3. VERSION 1 (V1) SCOPE & TECHNICAL DELIVERABLES\n•\nModule 1 — Silent Keystroke Listener: Background listener utilizing system-level hooks to extract key-gap timing\nmatrices without recording actual key text (GDPR/Privacy Compliant).",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 25,
+      "line_end": 30,
+      "bbox": [
+        42.52,
+        630.44,
+        543.85,
+        751.06
+      ],
+      "has_table": false,
+      "character_count": 459
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c29",
+    "text": "•\nModule 1 — Silent Keystroke Listener: Background listener utilizing system-level hooks to extract key-gap timing\nmatrices without recording actual key text (GDPR/Privacy Compliant).\n•\nModule 2 — Dynamic Screen Overlay: Lightweight Python/Win32 GUI layer rendering tamper-proof, semi-\ntransparent watermark metrics over active screen view.\nAeroGuard AI — Confidential & Proprietary\nPage 1 of 2",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 29,
+      "line_end": 33,
+      "bbox": [
+        42.52,
+        727.31,
+        552.77,
+        820.37
+      ],
+      "has_table": false,
+      "character_count": 394
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p1_c33",
+    "text": "AeroGuard AI — Confidential & Proprietary\nPage 1 of 2",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 1,
+      "line_start": 33,
+      "line_end": 33,
+      "bbox": [
+        42.52,
+        812.37,
+        552.77,
+        820.37
+      ],
+      "has_table": false,
+      "character_count": 53
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p2_c1",
+    "text": "•\nModule 3 — Fail-Safe Watchdog & Logging: Dual-process architecture (`Watchdog Daemon`) providing instant\nauto-restart upon unexpected main engine crashes, wrapped in isolated `try-except-finally` code blocks.\n•\nModule 4 — Encrypted Local Logger: Encrypted SQLite transaction engine storing anomaly alerts locally for\nautomated weekly admin sync.\nYEAR 1 VALUATION TARGET\n₹1,00,00,000 – ₹3,00,00,000",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 2,
+      "line_start": 1,
+      "line_end": 6,
+      "bbox": [
+        50.05,
+        44.89,
+        530.49,
+        174.64
+      ],
+      "has_table": false,
+      "character_count": 399
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p2_c5",
+    "text": "YEAR 1 VALUATION TARGET\n₹1,00,00,000 – ₹3,00,00,000\nBased on 1,000 Active Endpoints @ ₹300/User/Month ARR Model\n4. 12-MONTH COMMERCIALIZATION ROADMAP\nMonths 1–3:\nV1 PROTOTYPE\n Core engine completion, local testing, zero-cost development, and initial IP filing.\nMonths 4–6:\nBETA DEPLOYMENT Onboarding 5–10 local IT firms (approx. 250 endpoints) for field validation.",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 2,
+      "line_start": 5,
+      "line_end": 10,
+      "bbox": [
+        42.52,
+        130.51,
+        523.03,
+        305.67
+      ],
+      "has_table": false,
+      "character_count": 365
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p2_c9",
+    "text": "Months 1–3:\nV1 PROTOTYPE\n Core engine completion, local testing, zero-cost development, and initial IP filing.\nMonths 4–6:\nBETA DEPLOYMENT Onboarding 5–10 local IT firms (approx. 250 endpoints) for field validation.\nValuation: ₹50L – ₹75L.\nMonths 7–12:\nCOMMERCIAL SCALE B2B enterprise sales launch (₹300/PC/mo), Code Signing Certificate\nintegration, & ARR growth. Valuation: ₹1Cr+.\n5. TECHNICAL STACK & ZERO-COST ARCHITECTURE",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 2,
+      "line_start": 9,
+      "line_end": 14,
+      "bbox": [
+        42.52,
+        274.71,
+        523.03,
+        407.74
+      ],
+      "has_table": false,
+      "character_count": 425
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p2_c13",
+    "text": "integration, & ARR growth. Valuation: ₹1Cr+.\n5. TECHNICAL STACK & ZERO-COST ARCHITECTURE\nLanguage & Logic : Python 3.x (Core Prototype) -> C++ / Rust (Kernel Hooks Scale)\nUI Overlay Engine : Win32GUI / PyGObject / Tkinter\nDatabase & Cipher : SQLite3 + Cryptography (AES-256 GCM Mode)\nDeployment Target : Standalone Executable (.exe / .msi Package via PyInstaller/Nuitka)\nDevelopment Cost : ₹0 (100% Open-Source & Local Workstation Setup)\n6. RISK MITIGATION & PRODUCTION FAIL-SAFE\nTo eliminate client PC freeze or crash risks, AeroGuard AI implements a dual safety layer:",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 2,
+      "line_start": 13,
+      "line_end": 18,
+      "bbox": [
+        42.52,
+        347.14,
+        495.97,
+        592.62
+      ],
+      "has_table": false,
+      "character_count": 570
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p2_c17",
+    "text": "6. RISK MITIGATION & PRODUCTION FAIL-SAFE\nTo eliminate client PC freeze or crash risks, AeroGuard AI implements a dual safety layer:\n•\nRemote Kill-Switch: Reads a local network `security_policy.json` file every 5 minutes. IT administrators can toggle off\nfeatures instantly across all 5,000 PCs without requiring a system reboot.\n•\nGraceful Degradation: If typing biometric analysis fails, the system isolates the module and defaults to active screen\nwatermarking without bringing down the OS.",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 2,
+      "line_start": 17,
+      "line_end": 22,
+      "bbox": [
+        42.52,
+        550.99,
+        553.9,
+        661.62
+      ],
+      "has_table": false,
+      "character_count": 493
+    }
+  },
+  {
+    "chunk_id": "AeroGuard_AI_V1_Specification.pdf_p2_c21",
+    "text": "•\nGraceful Degradation: If typing biometric analysis fails, the system isolates the module and defaults to active screen\nwatermarking without bringing down the OS.\nAeroGuard AI — Confidential & Proprietary\nPage 2 of 2",
+    "metadata": {
+      "file_name": "AeroGuard_AI_V1_Specification.pdf",
+      "page_number": 2,
+      "line_start": 21,
+      "line_end": 23,
+      "bbox": [
+        42.52,
+        637.87,
+        552.77,
+        820.37
+      ],
+      "has_table": false,
+      "character_count": 217
+    }
+  }
+]
