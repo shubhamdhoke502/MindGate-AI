@@ -173,3 +173,9 @@
 ## [1.8.2] - Dynamic Workspace Chat Logging
 ### Modified
 - Updated `modules/chat_history.py` to dynamically accept `workspace_dir` to ensure chat logs stay isolated per user session.
+
+# CHANGELOG - MindGate AI Engine
+
+## [1.10.0] - Requirements Specification
+### Added
+- Created `requirements.txt` with pinned production dependencies for FastAPI, PyMuPDF, ChromaDB, Sentence-Transformers, and Rank-BM25.
