@@ -7,6 +7,7 @@ import time
 import math
 from typing import List, Dict, Any, Optional
 from collections import Counter
+import chromadb
 from chromadb.utils import embedding_functions
 
 try:
