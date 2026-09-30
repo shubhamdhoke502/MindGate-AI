@@ -206,10 +206,7 @@ class VectorStoreManager:
         self._collection = None
         self._indexed_chunks = []
 
-        # ONNX DLL crash se bachne ke liye explicit SentenceTransformer embedding initialization
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
 
     def _get_collection(self):
         self.compressor.register_activity()
