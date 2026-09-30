@@ -7,6 +7,7 @@ import time
 import math
 from typing import List, Dict, Any, Optional
 from collections import Counter
+from chromadb.utils import embedding_functions
 
 try:
     import chromadb
@@ -204,6 +205,11 @@ class VectorStoreManager:
         self._collection = None
         self._indexed_chunks = []
 
+        # ONNX DLL crash se bachne ke liye explicit SentenceTransformer embedding initialization
+        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+
     def _get_collection(self):
         self.compressor.register_activity()
         if self._client is None or self.compressor.is_compressed:
@@ -211,6 +217,7 @@ class VectorStoreManager:
                 self._client = chromadb.PersistentClient(path=self.db_dir)
                 self._collection = self._client.get_or_create_collection(
                     name="mindgate_pdf_chunks",
+                    embedding_function=self.embedding_fn,
                     metadata={"hnsw:space": "cosine"}
                 )
         return self._collection
@@ -228,7 +235,7 @@ class VectorStoreManager:
         for chunk in chunks:
             documents.append(chunk["text"])
             meta = chunk["metadata"].copy()
-            meta["bbox"] = str(meta["bbox"])
+            meta["bbox"] = str(meta.get("bbox", ""))
             metadatas.append(meta)
             ids.append(chunk["chunk_id"])
 
