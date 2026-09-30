@@ -1,0 +1,4 @@
+storage\.mindgate/
+chroma_db/
+chunks_cache/
+defult_workpace
