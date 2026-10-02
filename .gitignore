@@ -1,4 +1,20 @@
-storage\.mindgate/
+storage/
+.mindgate/
 chroma_db/
 chunks_cache/
-defult_workpace
+chroma_db.mgdb/
+defult_workpace/
+uploads/
+
+# Virtual Environment ignore karein
+venv/
+.venv/
+env/
+
+# Python cache files ignore karein
+__pycache__/
+*.pyc
+
+# Local ChromaDB Vector storage ignore karein
+storage/
+*.mgdb

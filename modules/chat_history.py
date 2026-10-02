@@ -46,3 +46,4 @@ class ChatHistoryManager:
         """Clears the chat history log for the active workspace."""
         with open(self.history_file, "w", encoding="utf-8") as f:
             json.dump([], f)
+        
