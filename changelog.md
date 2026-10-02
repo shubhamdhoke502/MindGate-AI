@@ -179,3 +179,45 @@
 ## [1.10.0] - Requirements Specification
 ### Added
 - Created `requirements.txt` with pinned production dependencies for FastAPI, PyMuPDF, ChromaDB, Sentence-Transformers, and Rank-BM25.
+
+# Changelog - MindGate AI Engine
+
+All notable changes, bug fixes, and ongoing investigation details for the MindGate AI offline document processing engine.
+
+---
+
+## [Unreleased / Bugfix Tracking] - 2026-10-02
+
+### 🔴 Ongoing Issue: Vector DB Ingestion & Embedding Runtime Crash
+- **Problem Statement:** PDF upload/ingestion pipeline fails during ChromaDB `upsert` phase.
+- **Primary Errors Encountered:**
+  1. `OSError: [WinError 1114] A dynamic link library (DLL) initialization routine failed. Error loading torch\lib\c10.dll`
+  2. `[CRITICAL INGESTION ERROR]: The onnxruntime python package is not installed. Please install it with pip install onnxruntime in upsert.`
+
+---
+
+### 🔍 Debugging History & Attempts Timeline
+
+#### Attempt 1: Switched to `SentenceTransformerEmbeddingFunction`
+- **Action:** Replaced ChromaDB's default `embedding_functions.DefaultEmbeddingFunction()` with `SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")` in `modules/vector_db.py`.
+- **Result:** Failed. Triggered PyTorch C++ DLL initialisation error (`c10.dll` crash under Windows environment).
+
+#### Attempt 2: Environment Variable Patch
+- **Action:** Executed `$env:KMP_DUPLICATE_LIB_OK="TRUE"` to fix OpenMP/Intel DLL conflicts.
+- **Result:** Temporary bypass, but underlying PyTorch runtime linking issue persisted on Uvicorn reload.
+
+#### Attempt 3: Custom / Dummy Embedding Function (BM25 Fallback Mode)
+- **Action:** Created a lightweight non-PyTorch embedding class to satisfy ChromaDB interface while relying on BM25 sparse retrieval.
+- **Result:** ChromaDB internally still invoked default ONNX embedding hooks during `upsert()`, throwing `onnxruntime package not installed` error.
+
+#### Attempt 4: Virtual Environment Package Installation
+- **Action:** Ran `.\venv\Scripts\pip install onnxruntime` and executed Uvicorn directly via `.\venv\Scripts\uvicorn`.
+- **Result:** Ingestion error still re-occurs due to mismatch in ChromaDB collection binding or cached system embedding function invocation.
+
+---
+
+### 📌 Current Status & Next Action Items
+1. **Root Cause:** ChromaDB's `get_or_create_collection()` / `upsert()` is hard-linked to an ONNX or SentenceTransformer runtime even when customized, causing binary dependency crashes on Windows.
+2. **Next Steps:**
+   - Inspect `modules/vector_db.py` collection initialization to explicitly pass `embedding_function=self.embedding_fn` inside `get_or_create_collection()`.
+   - Verify `venv` vs global Python path conflicts in VS Code / PowerShell to ensure clean package resolution.
