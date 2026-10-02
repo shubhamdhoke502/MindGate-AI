@@ -206,8 +206,9 @@ class VectorStoreManager:
         self._collection = None
         self._indexed_chunks = []
 
-        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
-
+        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+)
     def _get_collection(self):
         self.compressor.register_activity()
         if self._client is None or self.compressor.is_compressed:
