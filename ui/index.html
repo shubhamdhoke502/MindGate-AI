@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindGate AI</title>
-    <!-- FontAwesome for Icons -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -44,6 +44,12 @@
             flex-direction: column;
             padding: 12px;
             gap: 12px;
+            transition: margin-left 0.3s ease, width 0.3s ease;
+            z-index: 100;
+        }
+
+        .sidebar.collapsed {
+            margin-left: -260px;
         }
 
         .btn-sidebar {
@@ -112,13 +118,14 @@
             background-color: #5c1d1d;
         }
 
-        /* Main Chat Area */
+        /* Main Section */
         .main-container {
             flex: 1;
             display: flex;
             flex-direction: column;
             height: 100vh;
             background-color: var(--bg-dark);
+            position: relative;
         }
 
         .header {
@@ -126,19 +133,70 @@
             border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 16px;
             font-size: 14px;
             color: var(--text-muted);
         }
 
+        .menu-btn {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .menu-btn:hover {
+            background-color: var(--hover-bg);
+        }
+
         .status-badge {
-            display: inline-flex;
+            display: none;
             align-items: center;
             gap: 6px;
             font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.indexing {
+            display: inline-flex;
+            color: #facc15;
+        }
+
+        .status-badge.indexed {
+            display: inline-flex;
             color: #4ade80;
         }
 
+        /* Welcome Centered Screen */
+        .welcome-screen {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .welcome-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .welcome-sub {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* Chat Scroll Box */
         .chat-box {
             flex: 1;
             overflow-y: auto;
@@ -146,9 +204,10 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+            z-index: 10;
         }
 
-        /* Message Styling */
+        /* Message Structure */
         .message-row {
             display: flex;
             flex-direction: column;
@@ -172,7 +231,6 @@
             line-height: 1.5;
             word-wrap: break-word;
             white-space: pre-wrap;
-            position: relative;
         }
 
         .message-row.user .message-bubble {
@@ -188,7 +246,7 @@
             border-bottom-left-radius: 2px;
         }
 
-        /* Copy Buttons */
+        /* Copy Action Buttons */
         .user-copy-btn {
             position: absolute;
             top: 6px;
@@ -233,11 +291,12 @@
             background-color: var(--hover-bg);
         }
 
-        /* Footer Input Box */
+        /* Footer Input Area */
         .footer {
             padding: 16px 24px;
             background-color: var(--bg-dark);
             border-top: 1px solid var(--border-color);
+            position: relative;
         }
 
         .input-wrapper {
@@ -248,10 +307,7 @@
             display: flex;
             align-items: flex-end;
             gap: 10px;
-        }
-
-        .input-wrapper:focus-within {
-            border-color: #555555;
+            position: relative;
         }
 
         .upload-icon-btn {
@@ -297,24 +353,48 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.2s;
             margin-bottom: 2px;
         }
 
-        .send-btn:hover {
-            opacity: 0.9;
+        /* @ Recall Popup List */
+        .mention-popup {
+            position: absolute;
+            bottom: 75px;
+            left: 24px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 280px;
+            max-height: 160px;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: none;
+            flex-direction: column;
+            z-index: 100;
         }
 
-        /* Hidden File Input */
-        #hiddenFileInput {
-            display: none;
+        .mention-item {
+            padding: 10px 12px;
+            font-size: 13px;
+            color: var(--text-main);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #333333;
         }
+
+        .mention-item:hover {
+            background-color: var(--hover-bg);
+        }
+
+        #hiddenFileInput { display: none; }
     </style>
 </head>
 <body>
 
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <button class="btn-sidebar" onclick="startNewChat()">
             <i class="fa-solid fa-plus"></i> New chat
         </button>
@@ -324,7 +404,7 @@
         </button>
 
         <div class="doc-list" id="docListContainer">
-            <!-- Dynamic Document items will append here -->
+            <!-- Uploaded Document items append here -->
         </div>
 
         <button class="flush-btn" onclick="flushMemory()">
@@ -332,22 +412,36 @@
         </button>
     </div>
 
-    <!-- Main Container -->
+    <!-- Main Section -->
     <div class="main-container">
+        <!-- Header -->
         <div class="header">
-            <i class="fa-solid fa-bars"></i>
+            <button class="menu-btn" onclick="toggleSidebar()" title="Toggle Menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            
             <span class="status-badge" id="indexingStatus">
-                <i class="fa-solid fa-circle" style="font-size: 8px;"></i> <span id="statusText">PDF Indexed</span>
+                <i class="fa-solid fa-circle" style="font-size: 8px;"></i> 
+                <span id="statusText">PDF Indexed</span>
             </span>
+        </div>
+
+        <!-- Centered Welcome Screen -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-title">How Can I Help You Today?</div>
+            <div class="welcome-sub">Upload documents or ask anything from your vector memory</div>
         </div>
 
         <!-- Chat Container -->
         <div class="chat-box" id="chatBox">
-            <!-- Messages append dynamically -->
+            <!-- Dynamic Messages -->
         </div>
 
-        <!-- Footer / Input Box -->
+        <!-- Footer Input -->
         <div class="footer">
+            <!-- Mention Popup Dropdown -->
+            <div class="mention-popup" id="mentionPopup"></div>
+
             <div class="input-wrapper">
                 <button class="upload-icon-btn" onclick="triggerFileUpload()" title="Upload Document">
                     <i class="fa-solid fa-plus"></i>
@@ -358,7 +452,7 @@
                     class="chat-textarea" 
                     placeholder="Ask MindGate AI... (Use '@' for memory)" 
                     rows="1"
-                    oninput="autoResizeTextarea(this)"
+                    oninput="handleInput(this)"
                     onkeydown="handleKeyDown(event)"
                 ></textarea>
 
@@ -372,12 +466,58 @@
 
     <script>
         let activeDocument = null;
-        let documentChatHistories = {}; // Document-wise chat history memory
+        let uploadedFiles = [];
+        let documentChatHistories = {};
 
-        // Auto resize textarea as text grows
+        // Sidebar Toggle Collapse Logic
+        function toggleSidebar() {
+            id('sidebar').classList.toggle('collapsed');
+        }
+
         function autoResizeTextarea(element) {
             element.style.height = 'auto';
             element.style.height = Math.min(element.scrollHeight, 180) + 'px';
+        }
+
+        function handleInput(element) {
+            autoResizeTextarea(element);
+            checkMentionTrigger(element.value);
+        }
+
+        // Check @ Mention Recall Logic
+        function checkMentionTrigger(text) {
+            const popup = id('mentionPopup');
+            const atIndex = text.lastIndexOf('@');
+
+            if (atIndex !== -1 && (atIndex === 0 || text[atIndex - 1] === ' ')) {
+                const query = text.substring(atIndex + 1).toLowerCase();
+                const matchedDocs = uploadedFiles.filter(f => f.toLowerCase().includes(query));
+
+                if (matchedDocs.length > 0) {
+                    popup.innerHTML = '';
+                    matchedDocs.forEach(doc => {
+                        const item = document.createElement('div');
+                        item.className = 'mention-item';
+                        item.innerHTML = `<i class="fa-regular fa-file-pdf"></i> ${doc}`;
+                        item.onclick = () => selectMention(doc, atIndex);
+                        popup.appendChild(item);
+                    });
+                    popup.style.display = 'flex';
+                    return;
+                }
+            }
+            popup.style.display = 'none';
+        }
+
+        function selectMention(docName, atIndex) {
+            const input = id('userPrompt');
+            const beforeAt = input.value.substring(0, atIndex);
+            input.value = `${beforeAt}@${docName} `;
+            id('mentionPopup').style.display = 'none';
+            input.focus();
+            
+            // Set as active recall doc
+            activeDocument = docName;
         }
 
         function handleKeyDown(event) {
@@ -388,7 +528,7 @@
         }
 
         function triggerFileUpload() {
-            document.getElementById('hiddenFileInput').click();
+            id('hiddenFileInput').click();
         }
 
         // Upload PDF Document
@@ -396,7 +536,12 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            document.getElementById('statusText').innerText = "Indexing Document...";
+            const statusBadge = id('indexingStatus');
+            const statusText = id('statusText');
+
+            statusBadge.className = "status-badge indexing";
+            statusText.innerText = "Indexing PDF...";
+
             const formData = new FormData();
             formData.append('file', file);
 
@@ -406,14 +551,26 @@
                     body: formData
                 });
                 
-                const data = await response.json();
-                document.getElementById('statusText').innerText = "PDF Indexed";
-                
-                // Add to sidebar
-                addDocumentToSidebar(file.name);
+                if (response.ok) {
+                    statusBadge.className = "status-badge indexed";
+                    statusText.innerText = "PDF Indexed";
+                    
+                    // Add to sidebar and array list
+                    if (!uploadedFiles.includes(file.name)) {
+                        uploadedFiles.push(file.name);
+                    }
+                    addDocumentToSidebar(file.name);
+
+                    setTimeout(() => {
+                        statusBadge.className = "status-badge";
+                    }, 4000);
+                } else {
+                    throw new Error("Upload Failed");
+                }
             } catch (err) {
                 console.error("Upload error:", err);
-                document.getElementById('statusText').innerText = "Upload Failed";
+                statusBadge.className = "status-badge";
+                alert("File Upload / Indexing Failed!");
             }
         }
 
@@ -423,9 +580,8 @@
             }
 
             const docList = id('docListContainer');
-            
-            // Check if item exists
             let existing = Array.from(docList.children).find(el => el.dataset.filename === filename);
+            
             if (!existing) {
                 const item = document.createElement('div');
                 item.className = 'doc-item';
@@ -439,12 +595,9 @@
 
         function selectDocument(filename, element) {
             activeDocument = filename;
-            
-            // Highlight sidebar item
             document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
             if (element) element.classList.add('active');
 
-            // Load Chat History for selected Document
             renderChatHistory(filename);
         }
 
@@ -452,6 +605,7 @@
             activeDocument = null;
             document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
             id('chatBox').innerHTML = '';
+            id('welcomeScreen').style.opacity = '1';
         }
 
         function renderChatHistory(filename) {
@@ -459,9 +613,14 @@
             chatBox.innerHTML = '';
 
             const history = documentChatHistories[filename] || [];
-            history.forEach(msg => {
-                appendMessageToUI(msg.role, msg.text, false);
-            });
+            if (history.length > 0) {
+                id('welcomeScreen').style.opacity = '0';
+                history.forEach(msg => {
+                    appendMessageToUI(msg.role, msg.text, false);
+                });
+            } else {
+                id('welcomeScreen').style.opacity = '1';
+            }
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
@@ -476,6 +635,8 @@
         }
 
         function appendMessageToUI(role, text, saveHistory = true) {
+            id('welcomeScreen').style.opacity = '0';
+
             const chatBox = id('chatBox');
             const row = document.createElement('div');
             row.className = `message-row ${role}`;
@@ -516,6 +677,8 @@
             const text = promptInput.value.trim();
             if (!text) return;
 
+            id('mentionPopup').style.display = 'none';
+
             // Render User Message
             appendMessageToUI('user', text, true);
             
@@ -523,7 +686,7 @@
             promptInput.value = '';
             promptInput.style.height = 'auto';
 
-            // Prepare AI Message Container
+            // Prepare AI Message Placeholder
             const aiRow = appendMessageToUI('ai', '', false);
             const bubbleDiv = aiRow.querySelector('.message-bubble');
             const aiCopyBtn = aiRow.querySelector('.ai-copy-btn');
@@ -531,14 +694,22 @@
             let fullAiResponse = "";
 
             try {
+                // Sent payload with all keys to prevent 422 error
                 const response = await fetch('/chat/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        query: text,
                         prompt: text,
+                        message: text,
+                        file_name: activeDocument,
                         active_doc: activeDocument
                     })
                 });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned HTTP ${response.status}`);
+                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
@@ -550,7 +721,7 @@
 
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
-                    buffer = lines.pop(); // Keep partial line
+                    buffer = lines.pop(); 
 
                     for (let line of lines) {
                         line = line.trim();
@@ -564,13 +735,12 @@
                                     id('chatBox').scrollTop = id('chatBox').scrollHeight;
                                 }
                             } catch (e) {
-                                // Ignore non-json boundary lines
+                                // Ignore non-JSON signals
                             }
                         }
                     }
                 }
 
-                // Update copy handler with complete AI text
                 aiCopyBtn.onclick = function() { copyToClipboard(fullAiResponse, this); };
 
                 if (activeDocument) {

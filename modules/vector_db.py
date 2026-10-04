@@ -121,4 +121,3 @@ class VectorStoreManager:
                     zipf.extractall(self.chroma_path)
             except Exception as e:
                 print(f"[VectorStore Decompression Error]: {str(e)}")
-                
