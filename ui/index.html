@@ -4,545 +4,602 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindGate AI</title>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --bg-primary: #212121;
-            --bg-sidebar: #171717;
-            --bg-input: #2f2f2f;
-            --bg-hover: #2f2f2f;
-            --text-primary: #ececec;
-            --text-secondary: #b4b4b4;
-            --border-color: #383838;
-            --accent: #0084ff;
+            --bg-dark: #1e1e1e;
+            --sidebar-bg: #141414;
+            --card-bg: #2a2a2a;
+            --hover-bg: #333333;
+            --text-main: #ececec;
+            --text-muted: #a0a0a0;
+            --accent-color: #3b82f6;
+            --user-msg-bg: #2d3748;
+            --ai-msg-bg: #1e1e1e;
+            --border-color: #333333;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
             display: flex;
             height: 100vh;
             overflow: hidden;
         }
 
-        /* Sidebar UI */
+        /* Sidebar Styling */
         .sidebar {
             width: 260px;
-            background-color: var(--bg-sidebar);
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             padding: 12px;
-            transition: margin-left 0.3s ease;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
-            z-index: 100;
+            gap: 12px;
         }
 
-        .sidebar.collapsed {
-            margin-left: -260px;
-        }
-
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            margin-bottom: 12px;
-        }
-
-        .new-chat-btn {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: transparent;
+        .btn-sidebar {
+            background-color: var(--card-bg);
+            color: var(--text-main);
             border: 1px solid var(--border-color);
-            color: var(--text-primary);
             padding: 10px 14px;
             border-radius: 8px;
             cursor: pointer;
-            width: 100%;
-            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
             transition: background 0.2s;
         }
 
-        .new-chat-btn:hover {
-            background: var(--bg-hover);
+        .btn-sidebar:hover {
+            background-color: var(--hover-bg);
         }
 
-        .upload-section {
-            margin-top: 15px;
-            border: 1px dashed var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            cursor: pointer;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        .upload-section:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .file-list {
-            flex-grow: 1;
+        .doc-list {
+            flex: 1;
             overflow-y: auto;
-            margin-top: 15px;
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
 
-        .file-item {
-            padding: 8px 12px;
+        .doc-item {
+            padding: 10px 12px;
             border-radius: 6px;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.03);
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        .btn-flush {
-            background: rgba(239, 68, 68, 0.15);
+        .doc-item:hover, .doc-item.active {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+        }
+
+        .doc-item.active {
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .flush-btn {
+            background-color: #3f1818;
             color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.3);
+            border: 1px solid #7f1d1d;
             padding: 10px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.85rem;
-            margin-top: auto;
-            transition: background 0.2s;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .btn-flush:hover {
-            background: rgba(239, 68, 68, 0.25);
+        .flush-btn:hover {
+            background-color: #5c1d1d;
         }
 
         /* Main Chat Area */
-        .main-content {
-            flex-grow: 1;
+        .main-container {
+            flex: 1;
             display: flex;
             flex-direction: column;
-            position: relative;
-            height: 100%;
-            background: var(--bg-primary);
+            height: 100vh;
+            background-color: var(--bg-dark);
         }
 
-        .top-bar {
+        .header {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
-            padding: 12px 16px;
             gap: 12px;
+            font-size: 14px;
+            color: var(--text-muted);
         }
 
-        .toggle-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 1.2rem;
-            padding: 6px 10px;
-            border-radius: 6px;
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #4ade80;
         }
 
-        .toggle-btn:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .chat-scroll-area {
-            flex-grow: 1;
+        .chat-box {
+            flex: 1;
             overflow-y: auto;
+            padding: 24px;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            width: 100%;
-        }
-
-        /* Hero Landing Center Screen */
-        .hero-container {
-            margin: auto;
-            text-align: center;
-            max-width: 600px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             gap: 20px;
         }
 
-        .hero-title {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .quick-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .quick-chip {
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .quick-chip:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        /* Message Stream List */
-        .messages-list {
-            width: 100%;
-            max-width: 768px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            padding: 20px;
-        }
-
+        /* Message Styling */
         .message-row {
             display: flex;
-            gap: 16px;
-            line-height: 1.6;
-            font-size: 0.95rem;
-        }
-
-        .message-row.user {
-            justify-content: flex-end;
-        }
-
-        .msg-bubble {
+            flex-direction: column;
             max-width: 80%;
-            padding: 12px 16px;
-            border-radius: 18px;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .message-row.user .msg-bubble {
-            background: #2f2f2f;
-            color: var(--text-primary);
-            border-bottom-right-radius: 4px;
-        }
-
-        .message-row.assistant .msg-bubble {
-            background: transparent;
-            color: var(--text-primary);
-            padding-left: 0;
-        }
-
-        .citation-tag {
-            display: inline-block;
-            background: #1e293b;
-            color: #38bdf8;
-            border: 1px solid #334155;
-            font-size: 0.75rem;
-            padding: 4px 8px;
-            border-radius: 6px;
-            margin-top: 8px;
-            cursor: pointer;
-        }
-
-        /* Floating Input Bar (ChatGPT Style) */
-        .input-container {
-            width: 100%;
-            max-width: 768px;
-            margin: 0 auto 24px auto;
-            padding: 0 20px;
             position: relative;
         }
 
-        .input-box-wrapper {
-            background: var(--bg-input);
+        .message-row.user {
+            align-self: flex-end;
+        }
+
+        .message-row.ai {
+            align-self: flex-start;
+            max-width: 85%;
+        }
+
+        .message-bubble {
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 15px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            position: relative;
+        }
+
+        .message-row.user .message-bubble {
+            background-color: var(--user-msg-bg);
+            color: var(--text-main);
+            border-bottom-right-radius: 2px;
+        }
+
+        .message-row.ai .message-bubble {
+            background-color: var(--ai-msg-bg);
+            color: var(--text-main);
             border: 1px solid var(--border-color);
-            border-radius: 24px;
-            padding: 10px 16px;
+            border-bottom-left-radius: 2px;
+        }
+
+        /* Copy Buttons */
+        .user-copy-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.4);
+            border: none;
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 12px;
+        }
+
+        .message-row.user:hover .user-copy-btn {
+            opacity: 1;
+        }
+
+        .ai-action-bar {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+            padding-left: 4px;
+        }
+
+        .ai-copy-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .ai-copy-btn:hover, .user-copy-btn:hover {
+            color: var(--text-main);
+            background-color: var(--hover-bg);
+        }
+
+        /* Footer Input Box */
+        .footer {
+            padding: 16px 24px;
+            background-color: var(--bg-dark);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .input-wrapper {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 8px 14px;
             display: flex;
             align-items: flex-end;
             gap: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
-            transition: border-color 0.2s;
         }
 
-        .input-box-wrapper:focus-within {
-            border-color: #666;
+        .input-wrapper:focus-within {
+            border-color: #555555;
+        }
+
+        .upload-icon-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-icon-btn:hover {
+            color: var(--text-main);
+            background-color: var(--hover-bg);
         }
 
         .chat-textarea {
-            flex-grow: 1;
+            flex: 1;
             background: transparent;
             border: none;
             outline: none;
-            color: var(--text-primary);
-            font-size: 0.95rem;
+            color: var(--text-main);
+            font-size: 15px;
             resize: none;
-            max-height: 200px;
+            max-height: 180px;
             min-height: 24px;
-            line-height: 24px;
+            padding: 6px 0;
+            line-height: 1.4;
         }
 
-        .btn-send-chat {
-            background: var(--text-primary);
-            color: var(--bg-primary);
+        .send-btn {
+            background-color: var(--text-main);
+            color: var(--bg-dark);
             border: none;
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            flex-shrink: 0;
             transition: opacity 0.2s;
+            margin-bottom: 2px;
         }
 
-        .btn-send-chat:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
+        .send-btn:hover {
+            opacity: 0.9;
         }
 
-        /* Mention Popup */
-        .at-popup {
-            position: absolute;
-            bottom: 70px;
-            left: 20px;
-            background: var(--bg-sidebar);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+        /* Hidden File Input */
+        #hiddenFileInput {
             display: none;
-            flex-direction: column;
-            width: 250px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            z-index: 10;
-        }
-
-        .at-item {
-            padding: 10px 14px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            color: var(--text-primary);
-        }
-
-        .at-item:hover {
-            background: var(--bg-hover);
         }
     </style>
 </head>
 <body>
 
-    <!-- Collapsible Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <button class="new-chat-btn" onclick="location.reload()">
-            <span>✏️</span> New chat
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <button class="btn-sidebar" onclick="startNewChat()">
+            <i class="fa-solid fa-plus"></i> New chat
         </button>
 
-        <div class="upload-section" id="uploadZone">
-            📁 Upload PDF Document
-            <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+        <button class="btn-sidebar" onclick="triggerFileUpload()">
+            <i class="fa-solid fa-folder-open"></i> Upload PDF Document
+        </button>
+
+        <div class="doc-list" id="docListContainer">
+            <!-- Dynamic Document items will append here -->
         </div>
 
-        <div class="file-list" id="fileList"></div>
-
-        <button class="btn-flush" onclick="flushMemory()">🧹 Flush RAM / VRAM</button>
+        <button class="flush-btn" onclick="flushMemory()">
+            <i class="fa-solid fa-broom"></i> Flush RAM / VRAM
+        </button>
     </div>
 
-    <!-- Main Chat Workspace -->
-    <div class="main-content">
-        <div class="top-bar">
-            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
-            <span style="font-size: 0.9rem; color: var(--text-secondary);" id="statusIndicator">MindGate AI Engine</span>
+    <!-- Main Container -->
+    <div class="main-container">
+        <div class="header">
+            <i class="fa-solid fa-bars"></i>
+            <span class="status-badge" id="indexingStatus">
+                <i class="fa-solid fa-circle" style="font-size: 8px;"></i> <span id="statusText">PDF Indexed</span>
+            </span>
         </div>
 
-        <div class="chat-scroll-area" id="scrollArea">
-            <!-- Initial Hero Landing -->
-            <div class="hero-container" id="heroContainer">
-                <div class="hero-title">What can I help with today?</div>
-                <div class="quick-actions">
-                    <div class="quick-chip" onclick="insertAtCommand('@memory.json')">🧠 Recall Memory</div>
-                    <div class="quick-chip" onclick="document.getElementById('fileInput').click()">📄 Summarize Document</div>
-                </div>
-            </div>
-
-            <!-- Active Messages List -->
-            <div class="messages-list" id="messagesList" style="display: none;"></div>
+        <!-- Chat Container -->
+        <div class="chat-box" id="chatBox">
+            <!-- Messages append dynamically -->
         </div>
 
-        <!-- Floating Input Bar -->
-        <div class="input-container">
-            <div class="at-popup" id="atPopup">
-                <div class="at-item" onclick="insertAtCommand('@memory.json')">🧠 @memory.json (Recall Memory)</div>
-            </div>
+        <!-- Footer / Input Box -->
+        <div class="footer">
+            <div class="input-wrapper">
+                <button class="upload-icon-btn" onclick="triggerFileUpload()" title="Upload Document">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+                
+                <textarea 
+                    id="userPrompt" 
+                    class="chat-textarea" 
+                    placeholder="Ask MindGate AI... (Use '@' for memory)" 
+                    rows="1"
+                    oninput="autoResizeTextarea(this)"
+                    onkeydown="handleKeyDown(event)"
+                ></textarea>
 
-            <div class="input-box-wrapper">
-                <textarea class="chat-textarea" id="userInput" rows="1" placeholder="Ask MindGate AI... (Use '@' for memory)"></textarea>
-                <button class="btn-send-chat" id="sendBtn" onclick="handleChatSubmit()">↑</button>
+                <button class="send-btn" onclick="sendMessage()">
+                    <i class="fa-solid fa-arrow-up"></i>
+                </button>
             </div>
+            <input type="file" id="hiddenFileInput" accept=".pdf,.txt,.docx" onchange="uploadDocument(event)">
         </div>
     </div>
 
     <script>
-        const API_BASE = "http://127.0.0.1:8000";
-        let activeWorkspace = "default_session";
+        let activeDocument = null;
+        let documentChatHistories = {}; // Document-wise chat history memory
 
-        document.addEventListener("DOMContentLoaded", () => {
-            initWorkspace();
-            setupEventListeners();
-        });
-
-        function toggleSidebar() {
-            document.getElementById("sidebar").classList.toggle("collapsed");
+        // Auto resize textarea as text grows
+        function autoResizeTextarea(element) {
+            element.style.height = 'auto';
+            element.style.height = Math.min(element.scrollHeight, 180) + 'px';
         }
 
-        async function initWorkspace() {
-            const formData = new FormData();
-            formData.append("workspace_id", activeWorkspace);
-            await fetch(`${API_BASE}/workspace/init`, { method: "POST", body: formData });
-        }
-
-        function setupEventListeners() {
-            const textarea = document.getElementById("userInput");
-            const uploadZone = document.getElementById("uploadZone");
-            const fileInput = document.getElementById("fileInput");
-
-            // Auto-expanding textarea height
-            textarea.addEventListener("input", function() {
-                this.style.height = "auto";
-                this.style.height = (this.scrollHeight) + "px";
-                
-                if (this.value.endsWith("@")) {
-                    document.getElementById("atPopup").style.display = "flex";
-                } else {
-                    document.getElementById("atPopup").style.display = "none";
-                }
-            });
-
-            textarea.addEventListener("keydown", function(e) {
-                if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleChatSubmit();
-                }
-            });
-
-            uploadZone.addEventListener("click", () => fileInput.click());
-            fileInput.addEventListener("change", (e) => handleFileUpload(e.target.files[0]));
-        }
-
-        async function handleFileUpload(file) {
-            if (!file || !file.name.endsWith(".pdf")) return alert("Please select a PDF file!");
-
-            const status = document.getElementById("statusIndicator");
-            status.innerText = "⏳ Ingesting PDF...";
-
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("workspace_id", activeWorkspace);
-
-            try {
-                const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
-                const data = await res.json();
-                if (data.status === "success") {
-                    addFileToList(file.name);
-                    status.innerText = "🟢 PDF Indexed";
-                }
-            } catch (err) {
-                status.innerText = "🔴 Upload Failed";
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
             }
         }
 
-        function addFileToList(fileName) {
-            const list = document.getElementById("fileList");
-            const item = document.createElement("div");
-            item.className = "file-item";
-            item.innerText = `📄 ${fileName}`;
-            list.appendChild(item);
+        function triggerFileUpload() {
+            document.getElementById('hiddenFileInput').click();
         }
 
-        async function handleChatSubmit() {
-            const textarea = document.getElementById("userInput");
-            const query = textarea.value.trim();
-            if (!query) return;
+        // Upload PDF Document
+        async function uploadDocument(event) {
+            const file = event.target.files[0];
+            if (!file) return;
 
-            // Hide Hero, Show Messages List
-            document.getElementById("heroContainer").style.display = "none";
-            const messagesList = document.getElementById("messagesList");
-            messagesList.style.display = "flex";
-
-            appendMessage("user", query);
-            textarea.value = "";
-            textarea.style.height = "auto";
-            document.getElementById("atPopup").style.display = "none";
-
-            const botBubble = appendMessage("assistant", "");
+            document.getElementById('statusText').innerText = "Indexing Document...";
+            const formData = new FormData();
+            formData.append('file', file);
 
             try {
-                const response = await fetch(`${API_BASE}/chat/stream`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query: query, workspace_id: activeWorkspace })
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                document.getElementById('statusText').innerText = "PDF Indexed";
+                
+                // Add to sidebar
+                addDocumentToSidebar(file.name);
+            } catch (err) {
+                console.error("Upload error:", err);
+                document.getElementById('statusText').innerText = "Upload Failed";
+            }
+        }
+
+        function addDocumentToSidebar(filename) {
+            if (!documentChatHistories[filename]) {
+                documentChatHistories[filename] = [];
+            }
+
+            const docList = id('docListContainer');
+            
+            // Check if item exists
+            let existing = Array.from(docList.children).find(el => el.dataset.filename === filename);
+            if (!existing) {
+                const item = document.createElement('div');
+                item.className = 'doc-item';
+                item.dataset.filename = filename;
+                item.innerHTML = `<i class="fa-regular fa-file-pdf"></i> <span>${filename}</span>`;
+                item.onclick = () => selectDocument(filename, item);
+                docList.appendChild(item);
+                selectDocument(filename, item);
+            }
+        }
+
+        function selectDocument(filename, element) {
+            activeDocument = filename;
+            
+            // Highlight sidebar item
+            document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+
+            // Load Chat History for selected Document
+            renderChatHistory(filename);
+        }
+
+        function startNewChat() {
+            activeDocument = null;
+            document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
+            id('chatBox').innerHTML = '';
+        }
+
+        function renderChatHistory(filename) {
+            const chatBox = id('chatBox');
+            chatBox.innerHTML = '';
+
+            const history = documentChatHistories[filename] || [];
+            history.forEach(msg => {
+                appendMessageToUI(msg.role, msg.text, false);
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function copyToClipboard(text, btnElement) {
+            navigator.clipboard.writeText(text).then(() => {
+                const origHTML = btnElement.innerHTML;
+                btnElement.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+                setTimeout(() => {
+                    btnElement.innerHTML = origHTML;
+                }, 1800);
+            });
+        }
+
+        function appendMessageToUI(role, text, saveHistory = true) {
+            const chatBox = id('chatBox');
+            const row = document.createElement('div');
+            row.className = `message-row ${role}`;
+
+            if (role === 'user') {
+                row.innerHTML = `
+                    <div class="message-bubble">${escapeHtml(text)}</div>
+                    <button class="user-copy-btn" onclick="copyToClipboard('${escapeJs(text)}', this)">
+                        <i class="fa-regular fa-copy"></i> Copy
+                    </button>
+                `;
+            } else {
+                row.innerHTML = `
+                    <div class="message-bubble">${escapeHtml(text)}</div>
+                    <div class="ai-action-bar">
+                        <button class="ai-copy-btn" onclick="copyToClipboard('${escapeJs(text)}', this)">
+                            <i class="fa-regular fa-copy"></i> Copy
+                        </button>
+                    </div>
+                `;
+            }
+
+            chatBox.appendChild(row);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            if (saveHistory && activeDocument) {
+                if (!documentChatHistories[activeDocument]) {
+                    documentChatHistories[activeDocument] = [];
+                }
+                documentChatHistories[activeDocument].push({ role, text });
+            }
+
+            return row;
+        }
+
+        async function sendMessage() {
+            const promptInput = id('userPrompt');
+            const text = promptInput.value.trim();
+            if (!text) return;
+
+            // Render User Message
+            appendMessageToUI('user', text, true);
+            
+            // Reset Input height
+            promptInput.value = '';
+            promptInput.style.height = 'auto';
+
+            // Prepare AI Message Container
+            const aiRow = appendMessageToUI('ai', '', false);
+            const bubbleDiv = aiRow.querySelector('.message-bubble');
+            const aiCopyBtn = aiRow.querySelector('.ai-copy-btn');
+
+            let fullAiResponse = "";
+
+            try {
+                const response = await fetch('/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: text,
+                        active_doc: activeDocument
+                    })
                 });
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
+                let buffer = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    const chunk = decoder.decode(value);
-                    botBubble.innerText += chunk;
-                    document.getElementById("scrollArea").scrollTop = document.getElementById("scrollArea").scrollHeight;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep partial line
+
+                    for (let line of lines) {
+                        line = line.trim();
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.replace('data: ', '').trim();
+                            try {
+                                const parsed = JSON.parse(jsonStr);
+                                if (parsed.token) {
+                                    fullAiResponse += parsed.token;
+                                    bubbleDiv.innerText = fullAiResponse;
+                                    id('chatBox').scrollTop = id('chatBox').scrollHeight;
+                                }
+                            } catch (e) {
+                                // Ignore non-json boundary lines
+                            }
+                        }
+                    }
                 }
+
+                // Update copy handler with complete AI text
+                aiCopyBtn.onclick = function() { copyToClipboard(fullAiResponse, this); };
+
+                if (activeDocument) {
+                    documentChatHistories[activeDocument].push({ role: 'ai', text: fullAiResponse });
+                }
+
             } catch (err) {
-                botBubble.innerText = "Error streaming response.";
+                bubbleDiv.innerText = "Error streaming response.";
+                console.error("Streaming error:", err);
             }
         }
 
-        function appendMessage(role, text) {
-            const messagesList = document.getElementById("messagesList");
-            const row = document.createElement("div");
-            row.className = `message-row ${role}`;
-
-            const bubble = document.createElement("div");
-            bubble.className = "msg-bubble";
-            bubble.innerText = text;
-
-            row.appendChild(bubble);
-            messagesList.appendChild(row);
-
-            const scrollArea = document.getElementById("scrollArea");
-            scrollArea.scrollTop = scrollArea.scrollHeight;
-            return bubble;
-        }
-
-        function insertAtCommand(cmd) {
-            const textarea = document.getElementById("userInput");
-            textarea.value += cmd;
-            document.getElementById("atPopup").style.display = "none";
-            textarea.focus();
-        }
-
         async function flushMemory() {
-            await fetch(`${API_BASE}/system/flush`, { method: "POST" });
-            alert("System RAM & VRAM flushed successfully!");
+            try {
+                await fetch('/flush_memory', { method: 'POST' });
+                alert("RAM / VRAM Flushed successfully.");
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function id(elementId) { return document.getElementById(elementId); }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function escapeJs(str) {
+            return str.replace(/'/g, "\\'").replace(/\n/g, "\\n");
         }
     </script>
 </body>
