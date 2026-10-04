@@ -221,3 +221,49 @@ All notable changes, bug fixes, and ongoing investigation details for the MindGa
 2. **Next Steps:**
    - Inspect `modules/vector_db.py` collection initialization to explicitly pass `embedding_function=self.embedding_fn` inside `get_or_create_collection()`.
    - Verify `venv` vs global Python path conflicts in VS Code / PowerShell to ensure clean package resolution.
+   
+# Changelog - MindGate AI Engine
+
+All notable changes, bug fixes, and system improvements for the MindGate AI offline document processing engine.
+
+---
+
+## [1.0.1] - 2026-10-04
+
+### 🟢 Bug Fix: Resolved PyTorch DLL & ONNX Dependency Crashes
+- **Root Cause Analysis:** ChromaDB by default attempted to load `onnxruntime` and PyTorch binary libraries for text embeddings. This triggered two critical runtime crashes on Windows:
+  1. `OSError: [WinError 1114] A dynamic link library (DLL) initialization routine failed. Error loading torch\lib\c10.dll`
+  2. `[CRITICAL INGESTION ERROR]: The onnxruntime python package is not installed.`
+- **Resolution:** Refactored the architecture in `modules/vector_db.py` by implementing a pure Python-based custom embedding function, completely eliminating heavy external binary dependencies (PyTorch / ONNX Runtime).
+
+### 🛠️ Key Architectural & Code Changes in `modules/vector_db.py`
+- **Custom `PureBM25EmbeddingFunction` Class:** Created a custom zero-dependency embedding class inheriting from ChromaDB's `EmbeddingFunction` interface to satisfy vector schema constraints without invoking external binary models.
+- **Explicit Collection Binding:** Explicitly passed `embedding_function=PureBM25EmbeddingFunction()` inside `get_or_create_collection(name="mindgate_collection_v2")` to prevent ChromaDB from defaulting back to internal ONNX loaders.
+- **Dependency Elimination:** Removed all imports and execution paths linked to PyTorch (`c10.dll`) and `onnxruntime` packages, securing a 100% stable local environment.
+- **Storage & Cache Purge:** Cleared legacy database metadata (`storage/.mindgate/chroma_db`) to re-initialize the database under the new schema.
+
+### 🚀 System Verification & Execution Status
+- **Server Boot:** Uvicorn server (`http://127.0.0.1:8000`) starts smoothly without any DLL initialization errors or missing package warnings.
+- **PDF Ingestion Success:** Document parsing and vector indexing completed successfully (`POST /upload 200 OK`), with PyMuPDF extracting chunks and the UI displaying `🟢 PDF Indexed`.
+
+# Changelog - MindGate AI Engine
+
+All notable changes, bug fixes, and system improvements for the MindGate AI offline document processing engine.
+
+---
+
+## [1.0.1] - 2026-10-04
+
+### 🟢 Resolved: PyTorch DLL & ONNX Dependency Crashes During Ingestion
+- **Fixed Error 1:** `OSError: [WinError 1114] A dynamic link library (DLL) initialization routine failed. Error loading torch\lib\c10.dll`
+- **Fixed Error 2:** `[CRITICAL INGESTION ERROR]: The onnxruntime python package is not installed.`
+
+### 🛠️ Key Architectural Changes
+- **Implemented Pure BM25 Embedding Function:** Replaced default ONNX / SentenceTransformer embedding calls in `modules/vector_db.py` with a zero-dependency custom `PureBM25EmbeddingFunction`.
+- **Bypassed External Runtime Binaries:** Removed dependency on heavy PyTorch (`c10.dll`) and `onnxruntime` libraries to keep execution 100% lightweight and local.
+- **Explicit Collection Binding:** Bound `PureBM25EmbeddingFunction` explicitly inside `get_or_create_collection(name="mindgate_collection_v2")` to prevent ChromaDB from dropping back to ONNX default configs during `upsert`.
+- **Cache Clean-up:** Purged legacy metadata and database cache under `storage/.mindgate/chroma_db`.
+
+### 🚀 System Verification Status
+- **Server Launch:** Server starts cleanly on `http://127.0.0.1:8000` via Uvicorn reload without any DLL initialization or missing package warnings.
+- **PDF Ingestion:** Successfully parsed and indexed uploaded PDFs (`POST /upload 200 OK`) with UI displaying `🟢 PDF Indexed`.
