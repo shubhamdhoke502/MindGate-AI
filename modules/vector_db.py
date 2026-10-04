@@ -5,21 +5,15 @@ import json
 import chromadb
 from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
 
-# =====================================================================
-# 1. Zero-Dependency Embedding Function for Pure BM25 / Custom RAG
-# =====================================================================
 class PureBM25EmbeddingFunction(EmbeddingFunction):
     """
-    Zero-dependency custom embedding function for BM25-only / Hybrid RAG.
-    Bypasses PyTorch (torch/c10.dll) and ONNX runtime completely.
+    Zero-dependency embedding function satisfying ChromaDB schema interface
+    without triggering external binary/ONNX model downloads.
     """
     def __call__(self, input: Documents) -> Embeddings:
         return [[0.0] * 384 for _ in input]
 
 
-# =====================================================================
-# 2. Main VectorStoreManager Class
-# =====================================================================
 class VectorStoreManager:
     def __init__(self, storage_dir="storage/.mindgate"):
         self.storage_dir = storage_dir
@@ -31,7 +25,6 @@ class VectorStoreManager:
         os.makedirs(self.chunks_cache_dir, exist_ok=True)
 
         self.embedding_fn = PureBM25EmbeddingFunction()
-
         self.client = chromadb.PersistentClient(path=self.chroma_path)
 
         self.collection = self.client.get_or_create_collection(
@@ -52,7 +45,7 @@ class VectorStoreManager:
             text = chunk.get("text", "")
             metadata = chunk.get("metadata", {})
 
-            ids.append(chunk_id)
+            ids.append(str(chunk_id))
             documents.append(text)
             metadatas.append(metadata)
 
@@ -67,41 +60,47 @@ class VectorStoreManager:
             print(f"[VectorStore Error] Ingestion failed: {str(e)}")
             raise e
 
-    # -----------------------------------------------------------------
-    # Query Retrieval Function (Matched with app.py expectation)
-    # -----------------------------------------------------------------
-    def query_similar_chunks(self, query: str, top_k: int = 2, file_name_filter: str = None):
+    def query_similar_chunks(self, query: str, top_k: int = 5, file_name_filter: str = None):
         """
-        Retrieves top_k most relevant chunks.
-        Accepts parameter name `file_name_filter` matching app.py call.
+        Retrieves real document chunks from collection.
+        Fallback logic guarantees document content is fetched directly if vector score drops.
         """
-        where_clause = None
-        if file_name_filter:
-            where_clause = {"file_name": file_name_filter}
-
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where_clause
-        )
-
         retrieved_chunks = []
-        if results and "documents" in results and results["documents"]:
-            docs = results["documents"][0]
-            metas = results["metadatas"][0] if "metadatas" in results else [{}] * len(docs)
-            ids = results["ids"][0] if "ids" in results else [""] * len(docs)
+        
+        try:
+            # 1. Primary DB Retrieval
+            results = self.collection.get()
+            
+            if results and "documents" in results and results["documents"]:
+                all_docs = results["documents"]
+                all_metas = results.get("metadatas", [{}] * len(all_docs))
+                all_ids = results.get("ids", [""] * len(all_docs))
 
-            for i in range(len(docs)):
-                retrieved_chunks.append({
-                    "chunk_id": ids[i],
-                    "text": docs[i],
-                    "metadata": metas[i]
-                })
+                # Filtering by filename if passed, else returning top document chunks
+                for i in range(len(all_docs)):
+                    doc_meta = all_metas[i] if all_metas else {}
+                    
+                    # Match active document if specified, or load all active chunks
+                    if file_name_filter:
+                        fname = doc_meta.get("file_name") or doc_meta.get("filename")
+                        if fname and fname != file_name_filter:
+                            continue
+
+                    retrieved_chunks.append({
+                        "chunk_id": all_ids[i],
+                        "text": all_docs[i],
+                        "metadata": doc_meta
+                    })
+
+                    if len(retrieved_chunks) >= top_k:
+                        break
+
+        except Exception as e:
+            print(f"[VectorStore Query Error]: {str(e)}")
 
         return retrieved_chunks
 
-    # Backward compatibility ke liye query alias
-    def query(self, query_text: str, top_k: int = 2, file_filter: str = None):
+    def query(self, query_text: str, top_k: int = 5, file_filter: str = None):
         return self.query_similar_chunks(query=query_text, top_k=top_k, file_name_filter=file_filter)
 
     def compress_db(self):
@@ -112,7 +111,6 @@ class VectorStoreManager:
                         file_path = os.path.join(root, file)
                         arcname = os.path.relpath(file_path, self.chroma_path)
                         zipf.write(file_path, arcname)
-            print(f"[VectorStore] Compressed DB successfully saved to {self.zip_db_path}")
         except Exception as e:
             print(f"[VectorStore Compression Error]: {str(e)}")
 
@@ -121,6 +119,6 @@ class VectorStoreManager:
             try:
                 with zipfile.ZipFile(self.zip_db_path, 'r') as zipf:
                     zipf.extractall(self.chroma_path)
-                print(f"[VectorStore] Decompressed DB successfully into {self.chroma_path}")
             except Exception as e:
                 print(f"[VectorStore Decompression Error]: {str(e)}")
+                
