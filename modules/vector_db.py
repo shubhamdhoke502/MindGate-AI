@@ -14,7 +14,6 @@ class PureBM25EmbeddingFunction(EmbeddingFunction):
     Bypasses PyTorch (torch/c10.dll) and ONNX runtime completely.
     """
     def __call__(self, input: Documents) -> Embeddings:
-        # ChromaDB DB schema requirement ko satisfy karne ke liye static 384-dim dummy vector
         return [[0.0] * 384 for _ in input]
 
 
@@ -28,30 +27,19 @@ class VectorStoreManager:
         self.chunks_cache_dir = os.path.join(self.storage_dir, "chunks_cache")
         self.zip_db_path = os.path.join(self.storage_dir, "chroma_db.mgdb")
 
-        # Directories ensure karna
         os.makedirs(self.chroma_path, exist_ok=True)
         os.makedirs(self.chunks_cache_dir, exist_ok=True)
 
-        # 1. Custom Zero-Dependency Embedding Function Initialize Karo
         self.embedding_fn = PureBM25EmbeddingFunction()
 
-        # 2. Local Persistent ChromaDB Client Initialize
         self.client = chromadb.PersistentClient(path=self.chroma_path)
 
-        # 3. Collection Binding with Explicit Custom Embedding Function
-        # Explicitly passing embedding_function stops ChromaDB from picking ONNX default
         self.collection = self.client.get_or_create_collection(
             name="mindgate_collection_v2",
             embedding_function=self.embedding_fn
         )
 
-    # -----------------------------------------------------------------
-    # Document Chunks Ingestion & Vector Upsert
-    # -----------------------------------------------------------------
     def upsert_chunks(self, chunks: list):
-        """
-        Inserts or updates document chunks into ChromaDB with explicit coordinate metadata.
-        """
         if not chunks:
             return
 
@@ -68,7 +56,6 @@ class VectorStoreManager:
             documents.append(text)
             metadatas.append(metadata)
 
-        # Vector Upsert
         try:
             self.collection.upsert(
                 ids=ids,
@@ -81,19 +68,19 @@ class VectorStoreManager:
             raise e
 
     # -----------------------------------------------------------------
-    # Query Search / Retrieval Logic
+    # Query Retrieval Function (Matched with app.py expectation)
     # -----------------------------------------------------------------
-    def query(self, query_text: str, top_k: int = 2, file_filter: str = None):
+    def query_similar_chunks(self, query: str, top_k: int = 2, file_name_filter: str = None):
         """
-        Retrieves top_k most relevant chunks matching the query text.
-        Optionally filters by file_name metadata.
+        Retrieves top_k most relevant chunks.
+        Accepts parameter name `file_name_filter` matching app.py call.
         """
         where_clause = None
-        if file_filter:
-            where_clause = {"file_name": file_filter}
+        if file_name_filter:
+            where_clause = {"file_name": file_name_filter}
 
         results = self.collection.query(
-            query_texts=[query_text],
+            query_texts=[query],
             n_results=top_k,
             where=where_clause
         )
@@ -113,13 +100,11 @@ class VectorStoreManager:
 
         return retrieved_chunks
 
-    # -----------------------------------------------------------------
-    # Storage Compression Logic (.mgdb ZIP Auto-Archiving)
-    # -----------------------------------------------------------------
+    # Backward compatibility ke liye query alias
+    def query(self, query_text: str, top_k: int = 2, file_filter: str = None):
+        return self.query_similar_chunks(query=query_text, top_k=top_k, file_name_filter=file_filter)
+
     def compress_db(self):
-        """
-        Compresses local vector database into .mgdb archive to minimize disk footprint.
-        """
         try:
             with zipfile.ZipFile(self.zip_db_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(self.chroma_path):
@@ -132,9 +117,6 @@ class VectorStoreManager:
             print(f"[VectorStore Compression Error]: {str(e)}")
 
     def decompress_db(self):
-        """
-        Decompresses .mgdb archive into ChromaDB storage directory when active.
-        """
         if os.path.exists(self.zip_db_path):
             try:
                 with zipfile.ZipFile(self.zip_db_path, 'r') as zipf:
