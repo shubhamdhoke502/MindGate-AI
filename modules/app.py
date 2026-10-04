@@ -17,7 +17,7 @@ from modules.chunk_cache import ChunkCacheManager
 from modules.resource_manager import SystemResourceManager
 
 
-app = FastAPI(title="MindGate AI Engine", version="1.0.1")
+app = FastAPI(title="MindGate AI Engine", version="1.0.2")
 
 # CORS Setup
 app.add_middleware(
@@ -45,13 +45,14 @@ class MindGateEngine:
         self.resource_mgr = SystemResourceManager()
 
     def ingest_document(self, pdf_path: str) -> Dict[str, Any]:
-        """In-memory or disk-cached PDF ingestion with exact coordinate mapping."""
+        """PDF Parse -> Extract Text & BBox Metadata -> Save Disk Cache -> Index in Vector DB."""
         try:
             file_name = os.path.basename(pdf_path)
 
             if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
                 self.vector_store.compressor.register_activity()
 
+            # 1. Check Local Chunk Cache
             cached_chunks = None
             if hasattr(self.chunk_cache, 'get_cached_chunks'):
                 cached_chunks = self.chunk_cache.get_cached_chunks(pdf_path)
@@ -59,6 +60,7 @@ class MindGateEngine:
             if cached_chunks:
                 chunks = cached_chunks
             else:
+                # 2. Extract Chunks + Layout BBox Metadata using Production Parser
                 chunks = parse_pdf_with_coordinates(pdf_path)
                 if chunks and hasattr(self.chunk_cache, 'save_chunks_to_cache'):
                     self.chunk_cache.save_chunks_to_cache(pdf_path, chunks)
@@ -66,6 +68,7 @@ class MindGateEngine:
             if not chunks:
                 return {"status": "error", "message": "PDF parsing produced zero text content."}
 
+            # 3. Add Chunks & Metadata to Vector Database
             if hasattr(self.vector_store, 'add_chunks'):
                 self.vector_store.add_chunks(chunks)
             elif hasattr(self.vector_store, 'add_documents'):
@@ -85,51 +88,66 @@ class MindGateEngine:
             raise Exception(f"Ingestion failed: {str(e)}")
 
     def retrieve_relevant_chunks(self, query: str, active_pdf: Optional[str] = None) -> List[Dict[str, Any]]:
-        """100% Dynamic retrieval with guaranteed fallback to primary document chunks."""
+        """
+        Grounded Metadata Retrieval:
+        1. Tries Similarity Search with Strict file_name Filter.
+        2. Direct Fallback to Disk Cache / Document Chunks if Similarity Search yields 0 matches.
+        """
         retrieved_chunks = []
 
-        # 1. Similarity Search (Vector / Hybrid)
+        # 1. Primary Vector Search with Active PDF Filter
         if hasattr(self.vector_store, 'query_similar_chunks'):
             try:
                 retrieved_chunks = self.vector_store.query_similar_chunks(query, top_k=8, file_name_filter=active_pdf)
-            except Exception:
+            except Exception as e:
+                print(f"[Vector Search Error]: {e}")
                 retrieved_chunks = []
 
-        # 2. Direct Fallback: Pick initial document chunks directly from local store
-        if not retrieved_chunks:
-            if hasattr(self.vector_store, 'get_all_chunks_for_file') and active_pdf:
-                retrieved_chunks = self.vector_store.get_all_chunks_for_file(active_pdf, limit=8)
-            elif hasattr(self.vector_store, 'collection'):
+        # 2. Strict Fallback: Pull chunks directly from cache/store for broad queries ("isme kya hai", "summarize")
+        if not retrieved_chunks and active_pdf:
+            print(f"[Fallback Active]: Direct document metadata retrieval for {active_pdf}")
+            if hasattr(self.chunk_cache, 'get_cached_chunks'):
+                # Fetch directly from chunk disk cache
+                all_cached = self.chunk_cache.get_cached_chunks(active_pdf)
+                if all_cached:
+                    retrieved_chunks = all_cached[:8]
+
+            if not retrieved_chunks and hasattr(self.vector_store, 'collection'):
                 try:
-                    all_data = self.vector_store.collection.get()
+                    # Query ChromaDB collection with strict file_name metadata matching
+                    all_data = self.vector_store.collection.get(where={"file_name": active_pdf})
                     docs = all_data.get("documents", [])
                     metas = all_data.get("metadatas", [])
+                    
+                    if not docs:
+                        all_data = self.vector_store.collection.get(where={"filename": active_pdf})
+                        docs = all_data.get("documents", [])
+                        metas = all_data.get("metadatas", [])
+
                     for i, doc in enumerate(docs):
                         meta = metas[i] if metas else {}
-                        fname = meta.get("file_name") or meta.get("filename")
-                        if not active_pdf or fname == active_pdf:
-                            retrieved_chunks.append({"text": doc, "metadata": meta})
+                        retrieved_chunks.append({"text": doc, "metadata": meta})
                         if len(retrieved_chunks) >= 8:
                             break
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[Collection Fallback Error]: {e}")
 
         return retrieved_chunks
 
     def _build_prompt_and_citations(self, query: str, retrieved_chunks: List[Dict[str, Any]], active_pdf: Optional[str] = None):
-        """Constructs grounded context for Ollama SLM."""
+        """Builds clean, grounded prompt without echoing or leaking query wrappers."""
         context_str = ""
         citations = []
 
         for idx, item in enumerate(retrieved_chunks):
             meta = item.get("metadata", {})
-            file_n = meta.get('file_name', active_pdf or 'Document')
+            file_n = meta.get('file_name') or meta.get('filename') or active_pdf or 'Document'
             p_num = meta.get('page_number', meta.get('page', 1))
             l_start = meta.get('line_start', 1)
             l_end = meta.get('line_end', 1)
 
             citation_label = f"[Source: {file_n} | Page {p_num}]"
-            context_str += f"Context Block {idx+1} ({citation_label}):\n{item.get('text', '')}\n\n"
+            context_str += f"--- CONTEXT BLOCK {idx+1} ({citation_label}) ---\n{item.get('text', '')}\n\n"
 
             citations.append({
                 "file_name": file_n,
@@ -138,19 +156,24 @@ class MindGateEngine:
                 "citation_text": citation_label
             })
 
-        system_prompt = (
-            "You are MindGate AI, an intelligent local document assistant.\n"
-            "Analyze the document context provided below and answer the user query accurately and naturally.\n"
-            "If the user asks for a summary or general overview ('isme kya hai', 'overview'), synthesize the key information from all context blocks.\n\n"
-            f"DOCUMENT CONTEXT:\n{context_str}\n"
-            f"USER QUERY: {query}\n\n"
-            "ANSWER:"
-        )
+        system_prompt = f"""<|system|>
+You are MindGate AI, an expert document processing assistant.
+Analyze the provided document context below and answer the question directly, naturally, and accurately.
+If the question is an overview request ("isme kya hai", "summary", "overview"), summarize the main points contained in the provided context blocks.
+Do NOT repeat system labels or prompt tags in your answer.
 
+DOCUMENT CONTEXT:
+{context_str}
+<|end|>
+<|user|>
+Question: {query}
+<|end|>
+<|assistant|>
+"""
         return system_prompt, citations
 
     def ask(self, query: str, active_pdf: Optional[str] = None) -> Dict[str, Any]:
-        """Synchronous Query API."""
+        """Synchronous Query Execution."""
         if query.startswith("@"):
             search_term = query[1:]
             return self.container_memory.handle_at_trigger(search_term)
@@ -160,7 +183,7 @@ class MindGateEngine:
 
         self.chat_history.save_message(role="user", content=query)
 
-        # Retrieve chunks guaranteed
+        # Retrieve chunks strictly bound to active_pdf
         retrieved_chunks = self.retrieve_relevant_chunks(query, active_pdf)
 
         system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_pdf)
@@ -180,7 +203,7 @@ class MindGateEngine:
                 res = json.loads(response.read().decode("utf-8"))
                 slm_response = res.get("response", "").strip()
         except Exception as e:
-            slm_response = f"[Local Runtime Error]: Ollama service connection failed. Details: {e}"
+            slm_response = f"[Local SLM Error]: Ollama execution failed. Details: {e}"
 
         self.chat_history.save_message(role="assistant", content=slm_response, citations=citations)
 
@@ -201,7 +224,7 @@ class MindGateEngine:
         }
 
     def ask_stream(self, query: str, active_pdf: Optional[str] = None) -> Generator[str, None, None]:
-        """True SSE Streaming Endpoint without hardcoded strings."""
+        """True SSE Streaming Endpoint."""
         if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
             self.vector_store.compressor.register_activity()
 
@@ -211,7 +234,7 @@ class MindGateEngine:
 
         system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_pdf)
 
-        # First Event: Citations Metadata
+        # First Event: Send Citations Metadata Payload to UI
         yield f"data: {json.dumps({'citations': citations})}\n\n"
 
         url = f"{self.ollama_host}/api/generate"
@@ -237,7 +260,7 @@ class MindGateEngine:
                         yield f"data: {json.dumps({'token': token, 'done': done})}\n\n"
 
         except Exception as e:
-            err_msg = f"\n[Streaming Error]: Local Ollama execution failed: {str(e)}"
+            err_msg = f"\n[Streaming Error]: Ollama execution failed: {str(e)}"
             yield f"data: {json.dumps({'token': err_msg, 'done': True})}\n\n"
             full_response += err_msg
 
