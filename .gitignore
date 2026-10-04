@@ -6,6 +6,8 @@ chroma_db.mgdb/
 defult_workpace/
 uploads/
 
+workspace/
+default_session/
 # Virtual Environment ignore karein
 venv/
 .venv/
