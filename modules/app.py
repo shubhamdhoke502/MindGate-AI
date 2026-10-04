@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-# Production-grade imports
+# Production-grade module imports
 from modules.parser import parse_pdf_production_grade as parse_pdf_with_coordinates
 from modules.vector_db import VectorStoreManager
 from modules.container import ContainerMemoryManager
@@ -17,9 +17,9 @@ from modules.chunk_cache import ChunkCacheManager
 from modules.resource_manager import SystemResourceManager
 
 
-app = FastAPI(title="MindGate AI Engine")
+app = FastAPI(title="MindGate AI Engine", version="1.0.1")
 
-# CORS setup
+# CORS Setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,9 +35,9 @@ if os.path.exists("ui"):
 
 class MindGateEngine:
     def __init__(self, ollama_host: str = "http://127.0.0.1:11434", ollama_model: str = "phi3:mini"):
-        self.ollama_host = ollama_host
+        self.ollama_host = ollama_host.rstrip("/")
         self.ollama_model = ollama_model
-        
+
         # Initialize Core Managers
         self.vector_store = VectorStoreManager()
         self.container_memory = ContainerMemoryManager()
@@ -49,7 +49,7 @@ class MindGateEngine:
         """Uncompress DB -> Check Cache/Parse PDF -> Index Chunks -> Register Container."""
         try:
             file_name = os.path.basename(pdf_path)
-            
+
             # Safety Lock Release
             if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
                 self.vector_store.compressor.register_activity()
@@ -58,14 +58,14 @@ class MindGateEngine:
             cached_chunks = None
             if hasattr(self.chunk_cache, 'get_cached_chunks'):
                 cached_chunks = self.chunk_cache.get_cached_chunks(pdf_path)
-            
+
             if cached_chunks:
                 chunks = cached_chunks
             else:
                 chunks = parse_pdf_with_coordinates(pdf_path)
                 if chunks and hasattr(self.chunk_cache, 'save_chunks_to_cache'):
                     self.chunk_cache.save_chunks_to_cache(pdf_path, chunks)
-            
+
             if not chunks:
                 return {"status": "error", "message": "No text extracted from PDF."}
 
@@ -74,11 +74,11 @@ class MindGateEngine:
                 self.vector_store.add_chunks(chunks)
             elif hasattr(self.vector_store, 'add_documents'):
                 self.vector_store.add_documents(chunks)
-            
+
             # Register in Memory Container
             if hasattr(self.container_memory, 'register_document'):
                 self.container_memory.register_document(file_name)
-            
+
             return {
                 "status": "success",
                 "file_name": file_name,
@@ -89,43 +89,15 @@ class MindGateEngine:
             print(f"\n[CRITICAL INGESTION ERROR]: {str(e)}\n")
             raise Exception(f"Ingestion failed: {str(e)}")
 
-    def _query_local_slm(self, prompt: str) -> str:
-        """Sends grounded RAG prompt to local Ollama instance (100% Offline)."""
-        url = f"{self.ollama_host}/api/generate"
-        payload = {
-            "model": self.ollama_model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.2}
-        }
-        
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        
-        try:
-            with urllib.request.urlopen(req) as response:
-                res = json.loads(response.read().decode("utf-8"))
-                return res.get("response", "").strip()
-        except Exception as e:
-            return f"[Local SLM Error]: Ollama local instance run nahi ho raha hai. Details: {e}"
-
-    def ask(self, query: str, active_pdf: Optional[str] = None) -> Dict[str, Any]:
-        """Performs Search, SLM Answer, Citation Generation, Container Sync, and Chat Saving."""
-        if query.startswith("@"):
-            search_term = query[1:]
-            return self.container_memory.handle_at_trigger(search_term)
-
-        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
-            self.vector_store.compressor.register_activity()
-
-        self.chat_history.save_message(role="user", content=query)
-
-        # 1. Fetch search chunks (top_k=8 for comprehensive context)
+    def retrieve_relevant_chunks(self, query: str, active_pdf: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieves top-8 hybrid search chunks with dynamic fallback for general queries."""
         retrieved_chunks = []
+        
+        # 1. Primary Vector / Sparse Query Search
         if hasattr(self.vector_store, 'query_similar_chunks'):
             retrieved_chunks = self.vector_store.query_similar_chunks(query, top_k=8, file_name_filter=active_pdf)
 
-        # 2. Fallback Mechanism: Generic prompts ("isme kya likha hai", "summarize") ke liye direct PDF chunks fetch karo
+        # 2. Fallback Mechanism: Generic prompts ("isme kya hai", "summarize") ke liye direct PDF chunks fetch karo
         if not retrieved_chunks and active_pdf:
             if hasattr(self.vector_store, 'get_all_chunks_for_file'):
                 retrieved_chunks = self.vector_store.get_all_chunks_for_file(active_pdf, limit=8)
@@ -144,26 +116,23 @@ class MindGateEngine:
                 except Exception:
                     pass
 
-        # 3. Final Check
-        if not retrieved_chunks:
-            fallback_ans = "Document me is topic par koi info nahi mili ya PDF selected nahi hai."
-            self.chat_history.save_message(role="assistant", content=fallback_ans)
-            self.resource_mgr.flush_memory()
-            return {"answer": fallback_ans, "citations": []}
+        return retrieved_chunks
 
-        # 4. Context & Citation Preparation
+    def _build_prompt_and_citations(self, query: str, retrieved_chunks: List[Dict[str, Any]], active_pdf: Optional[str] = None):
+        """Prepares grounded RAG system prompt along with structured citation metadata."""
         context_str = ""
         citations = []
+
         for idx, item in enumerate(retrieved_chunks):
             meta = item.get("metadata", {})
             file_n = meta.get('file_name', active_pdf or 'Document')
             p_num = meta.get('page_number', meta.get('page', 1))
             l_start = meta.get('line_start', 1)
             l_end = meta.get('line_end', 1)
-            
+
             citation_label = f"[Source: {file_n} | Page {p_num}]"
             context_str += f"Context Block {idx+1} ({citation_label}):\n{item.get('text', '')}\n\n"
-            
+
             citations.append({
                 "file_name": file_n,
                 "page": p_num,
@@ -171,17 +140,55 @@ class MindGateEngine:
                 "citation_text": citation_label
             })
 
-        # 5. Smart Prompt Construct
         system_prompt = (
-            "You are MindGate AI, an expert document assistant.\n"
-            "Carefully analyze the document context provided below and answer the user query in a clear, well-structured manner.\n"
-            "If the user asks 'isme kya likha hai' or requests an overview/summary, summarize the core details from the context blocks.\n\n"
+            "You are MindGate AI, an expert, highly accurate local document assistant.\n"
+            "Carefully analyze the document context provided below and answer the user query directly, naturally, and accurately.\n"
+            "If the user asks 'isme kya likha hai', 'summarize', or requests an overview, synthesize the core details from all context blocks.\n"
+            "Do NOT invent facts outside the context.\n\n"
             f"DOCUMENT CONTEXT:\n{context_str}\n"
             f"USER QUERY: {query}\n\n"
             "ANSWER:"
         )
 
-        slm_response = self._query_local_slm(system_prompt)
+        return system_prompt, citations
+
+    def ask(self, query: str, active_pdf: Optional[str] = None) -> Dict[str, Any]:
+        """Synchronous Query Execution Endpoint."""
+        if query.startswith("@"):
+            search_term = query[1:]
+            return self.container_memory.handle_at_trigger(search_term)
+
+        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
+            self.vector_store.compressor.register_activity()
+
+        self.chat_history.save_message(role="user", content=query)
+
+        retrieved_chunks = self.retrieve_relevant_chunks(query, active_pdf)
+
+        if not retrieved_chunks:
+            fallback_ans = "Document me is topic par koi info nahi mili ya PDF selected nahi hai."
+            self.chat_history.save_message(role="assistant", content=fallback_ans)
+            self.resource_mgr.flush_memory()
+            return {"answer": fallback_ans, "citations": []}
+
+        system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_pdf)
+
+        url = f"{self.ollama_host}/api/generate"
+        payload = {
+            "model": self.ollama_model,
+            "prompt": system_prompt,
+            "stream": False,
+            "options": {"temperature": 0.2}
+        }
+
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req) as response:
+                res = json.loads(response.read().decode("utf-8"))
+                slm_response = res.get("response", "").strip()
+        except Exception as e:
+            slm_response = f"[Local SLM Error]: Ollama local instance active nahi hai. Details: {e}"
 
         self.chat_history.save_message(role="assistant", content=slm_response, citations=citations)
 
@@ -202,11 +209,66 @@ class MindGateEngine:
         }
 
     def ask_stream(self, query: str, active_pdf: Optional[str] = None) -> Generator[str, None, None]:
-        res = self.ask(query, active_pdf)
-        ans = res.get("answer", "")
-        words = ans.split(" ")
-        for word in words:
-            yield f"data: {json.dumps({'token': word + ' '})}\n\n"
+        """True SSE Streaming Endpoint for Real-time Token Generation."""
+        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
+            self.vector_store.compressor.register_activity()
+
+        self.chat_history.save_message(role="user", content=query)
+
+        retrieved_chunks = self.retrieve_relevant_chunks(query, active_pdf)
+
+        if not retrieved_chunks:
+            fallback = "Document me is topic par koi info nahi mili ya PDF selected nahi hai."
+            yield f"data: {json.dumps({'token': fallback, 'done': True, 'citations': []})}\n\n"
+            self.chat_history.save_message(role="assistant", content=fallback)
+            self.resource_mgr.flush_memory()
+            return
+
+        system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_pdf)
+
+        # First Event: Send Citations Metadata Payload to UI
+        yield f"data: {json.dumps({'citations': citations})}\n\n"
+
+        url = f"{self.ollama_host}/api/generate"
+        payload = {
+            "model": self.ollama_model,
+            "prompt": system_prompt,
+            "stream": True,
+            "options": {"temperature": 0.2}
+        }
+
+        full_response = ""
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req) as response:
+                for line in response:
+                    if line:
+                        decoded = json.loads(line.decode("utf-8"))
+                        token = decoded.get("response", "")
+                        done = decoded.get("done", False)
+                        full_response += token
+                        
+                        yield f"data: {json.dumps({'token': token, 'done': done})}\n\n"
+
+        except Exception as e:
+            err_msg = f"\n[Streaming Error]: Ollama execution failed: {str(e)}"
+            yield f"data: {json.dumps({'token': err_msg, 'done': True})}\n\n"
+            full_response += err_msg
+
+        # Save Final Streamed Message to History
+        self.chat_history.save_message(role="assistant", content=full_response, citations=citations)
+
+        if citations and hasattr(self.container_memory, 'save_highlight'):
+            top_meta = citations[0]
+            self.container_memory.save_highlight(
+                pdf_name=top_meta["file_name"],
+                page=top_meta["page"],
+                line_range=top_meta["lines"],
+                key_fact=full_response[:120] + "..."
+            )
+
+        self.resource_mgr.flush_memory()
 
     def get_chat_history(self) -> List[Dict]:
         return self.chat_history.get_all_messages()
@@ -216,14 +278,14 @@ class MindGateEngine:
 engine = MindGateEngine()
 
 
-# --- FastApi Routes ---
+# --- FastAPI Routes ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui():
     if os.path.exists("ui/index.html"):
         with open("ui/index.html", "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>MindGate AI Server Running</h1>"
+    return "<h1>MindGate AI Engine Active</h1>"
 
 
 @app.post("/upload")
@@ -231,7 +293,7 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         os.makedirs("uploads", exist_ok=True)
         file_path = os.path.join("uploads", file.filename)
-        
+
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
 
@@ -256,10 +318,27 @@ async def chat_stream(request: Request):
     )
 
 
+@app.post("/chat")
+async def chat_sync(request: Request):
+    data = await request.json()
+    query = data.get("query") or data.get("prompt") or data.get("message", "")
+    active_doc = data.get("file_name") or data.get("active_doc")
+
+    if not query:
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+
+    return engine.ask(query, active_pdf=active_doc)
+
+
+@app.get("/history")
+async def get_history():
+    return {"history": engine.get_chat_history()}
+
+
 @app.post("/flush_memory")
 async def flush_ram():
     engine.resource_mgr.flush_memory()
-    return {"status": "success", "message": "RAM / VRAM Flushed"}
+    return {"status": "success", "message": "RAM / VRAM Flushed Successfully"}
 
 
 if __name__ == "__main__":
