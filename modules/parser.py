@@ -1,154 +1,115 @@
-import fitz  # PyMuPDF
-import re
-import unicodedata
-from typing import List, Dict, Any, Optional
+import os
+import pymupdf as fitz
+from typing import List, Dict, Any
 
 def clean_devnagari_and_text(text: str) -> str:
-    """
-    Normalizes Devnagari (Hindi/Marathi) & English scripts, removes broken glyphs and PDF noise.
-    """
     if not text:
         return ""
-    
-    # Unicode NFC Normalization for accurate script representation
+    import unicodedata
     normalized = unicodedata.normalize("NFC", text)
-    # Fix broken Devnagari word joins
-    normalized = re.sub(r'(\w)\s*্\s*(\w)', r'\1\2', normalized)
-    # Remove unwanted control characters except newlines/spaces
-    normalized = re.sub(r'[\r\t\f\v]', ' ', normalized)
-    # Collapse multiple spaces
-    return re.sub(r' +', ' ', normalized).strip()
+    cleaned = "".join(ch for ch in normalized if unicodedata.category(ch) != "Cf")
+    return " ".join(cleaned.split())
 
+def parse_pdf_production_grade(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Robust Multi-Format Document Ingestion Engine with Path Auto-Resolution.
+    """
+    # PATH AUTO-RESOLUTION FIX: Agar path direct exist nahi karta, toh 'uploads/' me check karo
+    resolved_path = file_path
+    if not os.path.exists(resolved_path):
+        alt_path = os.path.join("uploads", os.path.basename(file_path))
+        if os.path.exists(alt_path):
+            resolved_path = alt_path
 
-def extract_tables_from_page(page) -> List[Dict[str, Any]]:
-    """
-    Extracts structured table content from PDF pages into Markdown format with exact bounding boxes.
-    """
-    extracted_tables = []
-    try:
-        tabs = page.find_tables()
-        for tab in tabs:
-            table_data = tab.extract()
-            if not table_data or len(table_data) == 0:
-                continue
-                
-            bbox = list(tab.bbox)
-            
-            # Convert tabular matrix into clean Markdown Table format
-            md_table_rows = []
-            for row in table_data:
-                clean_row = [clean_devnagari_and_text(str(cell or '')) for cell in row]
-                md_table_rows.append("| " + " | ".join(clean_row) + " |")
-            
-            if md_table_rows:
-                header = md_table_rows[0]
-                num_cols = len(table_data[0]) if table_data[0] else 1
-                separator = "| " + " | ".join(["---"] * num_cols) + " |"
-                body = md_table_rows[1:] if len(md_table_rows) > 1 else []
-                full_md_table = "\n".join([header, separator] + body)
-                
-                extracted_tables.append({
-                    "text": full_md_table,
-                    "bbox": [round(c, 2) for c in bbox],
-                    "is_table": True
+    if not os.path.exists(resolved_path):
+        raise FileNotFoundError(f"File not found at resolved path: {file_path}")
+
+    file_name = os.path.basename(resolved_path)
+    ext = os.path.splitext(file_name)[1].lower()
+    chunks = []
+
+    # Case 1: PDF Files
+    if ext == ".pdf":
+        doc = fitz.open(resolved_path)
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            blocks = page.get_text("blocks")
+
+            for block_idx, b in enumerate(blocks):
+                raw_text = b[4]
+                cleaned = clean_devnagari_and_text(raw_text)
+                if not cleaned or len(cleaned) < 5:
+                    continue
+
+                bbox = [round(coord, 2) for coord in b[:4]]
+                chunk_id = f"{file_name}_p{page_num + 1}_b{block_idx}"
+
+                chunks.append({
+                    "chunk_id": chunk_id,
+                    "text": cleaned,
+                    "metadata": {
+                        "chunk_id": chunk_id,
+                        "file_name": file_name,
+                        "page_number": page_num + 1,
+                        "line_start": block_idx * 5 + 1,
+                        "line_end": (block_idx + 1) * 5,
+                        "bbox": bbox
+                    }
                 })
-    except Exception:
-        # Graceful fallback for non-standard or encrypted tabular layouts
-        pass
-        
-    return extracted_tables
+        doc.close()
 
+    # Case 2: Text / Markdown Files
+    elif ext in [".txt", ".md"]:
+        with open(resolved_path, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
 
-def parse_pdf_production_grade(pdf_path: str, lines_per_chunk: int = 6, overlap_lines: int = 2) -> List[Dict[str, Any]]:
-    """
-    Production-Level Parser:
-    - Handles multi-column reading orders
-    - Extracts structured Markdown tables
-    - Cleans Devnagari NFC / English text
-    - Computes exact page coordinates/bounding boxes
-    """
-    doc = fitz.open(pdf_path)
-    file_name = pdf_path.split("/")[-1].split("\\")[-1]
-    all_chunks = []
-
-    for page_idx, page in enumerate(doc):
-        page_num = page_idx + 1
-        
-        # 1. Extract Structured Tables
-        page_tables = extract_tables_from_page(page)
-        
-        # 2. Extract Text Blocks with Layout Sorting (top-to-bottom, left-to-right)
-        blocks = page.get_text("blocks")
-        blocks.sort(key=lambda b: (round(b[1], 1), round(b[0], 1)))
-
-        page_elements = []
-
-        # Include Tables into page elements stream
-        for tbl in page_tables:
-            page_elements.append(tbl)
-
-        # Process Standard Paragraphs / Text Blocks
-        for b in blocks:
-            x0, y0, x1, y1, text, block_no, block_type = b
-            if block_type == 0:  # Standard Text Block
-                cleaned = clean_devnagari_and_text(text)
-                if cleaned:
-                    page_elements.append({
-                        "text": cleaned,
-                        "bbox": [round(x0, 2), round(y0, 2), round(x1, 2), round(y1, 2)],
-                        "is_table": False
-                    })
-
-        # OCR Warning Flag for purely image/scanned pages
-        if not page_elements:
-            pix = page.get_pixmap()
-            if pix.width > 0 and pix.height > 0:
-                print(f"[Parser Notice]: Page {page_num} in {file_name} might be scanned or image-only.")
-
-        # Chunking Strategy: Combine elements with context overlap and bounding box bounds
-        total_elements = len(page_elements)
-        step = max(1, lines_per_chunk - overlap_lines)
-
-        for i in range(0, total_elements, step):
-            group = page_elements[i : i + lines_per_chunk]
-            if not group:
+        chunk_size = 15
+        for idx in range(0, len(lines), chunk_size):
+            chunk_lines = lines[idx:idx + chunk_size]
+            chunk_text = clean_devnagari_and_text("".join(chunk_lines))
+            if not chunk_text:
                 continue
 
-            # Merge block texts and construct exact merged Bounding Box
-            chunk_text = "\n".join([e["text"] for e in group])
-            chunk_x0 = min(e["bbox"][0] for e in group)
-            chunk_y0 = min(e["bbox"][1] for e in group)
-            chunk_x1 = max(e["bbox"][2] for e in group)
-            chunk_y1 = max(e["bbox"][3] for e in group)
-
-            chunk_id = f"{file_name}_p{page_num}_c{i+1}"
-
-            all_chunks.append({
+            chunk_id = f"{file_name}_chunk_{idx // chunk_size}"
+            chunks.append({
                 "chunk_id": chunk_id,
                 "text": chunk_text,
                 "metadata": {
+                    "chunk_id": chunk_id,
                     "file_name": file_name,
-                    "page_number": page_num,
-                    "line_start": i + 1,
-                    "line_end": min(i + len(group), total_elements),
-                    "bbox": [chunk_x0, chunk_y0, chunk_x1, chunk_y1],
-                    "has_table": any(e.get("is_table", False) for e in group),
-                    "character_count": len(chunk_text)
+                    "page_number": 1,
+                    "line_start": idx + 1,
+                    "line_end": idx + len(chunk_lines),
+                    "bbox": [0, 0, 0, 0]
                 }
             })
 
-    doc.close()
-    return all_chunks
+    # Case 3: Word DOCX Files
+    elif ext == ".docx":
+        try:
+            import docx
+            doc = docx.Document(resolved_path)
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            chunk_size = 5
+            for idx in range(0, len(paragraphs), chunk_size):
+                chunk_text = clean_devnagari_and_text(" ".join(paragraphs[idx:idx + chunk_size]))
+                if not chunk_text:
+                    continue
 
+                chunk_id = f"{file_name}_chunk_{idx // chunk_size}"
+                chunks.append({
+                    "chunk_id": chunk_id,
+                    "text": chunk_text,
+                    "metadata": {
+                        "chunk_id": chunk_id,
+                        "file_name": file_name,
+                        "page_number": 1,
+                        "line_start": idx + 1,
+                        "line_end": idx + chunk_size,
+                        "bbox": [0, 0, 0, 0]
+                    }
+                })
+        except ImportError:
+            raise ImportError("Please install python-docx (`pip install python-docx`) to parse .docx files.")
 
-class LayoutAwareParser:
-    """Class wrapper for backward compatibility with modular app imports."""
-    def __init__(self):
-        pass
-
-    def parse_pdf(self, pdf_path: str, chunk_size: int = 6, overlap: int = 2) -> List[Dict[str, Any]]:
-        return parse_pdf_production_grade(pdf_path, lines_per_chunk=chunk_size, overlap_lines=overlap)
-
-
-if __name__ == "__main__":
-    print("[Production Parser Engine]: Layout, Table Aware & Devnagari NFC Parser Initialized.")
+    return chunks
