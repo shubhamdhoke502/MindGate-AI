@@ -17,7 +17,7 @@ from modules.chunk_cache import ChunkCacheManager
 from modules.resource_manager import SystemResourceManager
 
 
-app = FastAPI(title="MindGate AI Engine", version="1.0.6")
+app = FastAPI(title="MindGate AI Engine", version="1.0.7")
 
 # CORS Setup
 app.add_middleware(
@@ -45,8 +45,14 @@ class MindGateEngine:
         self.resource_mgr = SystemResourceManager()
 
     def ingest_document(self, file_path: str) -> Dict[str, Any]:
-        """Multi-format Document Ingestion -> Extract Chunks + Metadata -> Index in Vector DB."""
+        """Multi-format Document Ingestion -> Path Resolution -> Extract Chunks + Metadata -> Index in Vector DB."""
         try:
+            # FIX: Ensure proper path resolution for uploads directory
+            if not os.path.exists(file_path):
+                alt_path = os.path.join("uploads", os.path.basename(file_path))
+                if os.path.exists(alt_path):
+                    file_path = alt_path
+
             file_name = os.path.basename(file_path)
 
             if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
@@ -279,7 +285,6 @@ async def upload_file(file: UploadFile = File(...)):
         upload_dir = "uploads"
         os.makedirs(upload_dir, exist_ok=True)
         
-        # CRITICAL FIX: Full relative path banakar pass karna taaki FileNotFoundError na aaye
         full_path = os.path.join(upload_dir, file.filename)
 
         with open(full_path, "wb") as buffer:
