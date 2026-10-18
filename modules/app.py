@@ -1,6 +1,7 @@
 import json
 import os
 import urllib.request
+import logging
 from typing import Dict, Any, List, Optional, Generator
 
 from fastapi import FastAPI, UploadFile, File, Request, HTTPException
@@ -16,8 +17,14 @@ from modules.chat_history import ChatHistoryManager
 from modules.chunk_cache import ChunkCacheManager
 from modules.resource_manager import SystemResourceManager
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("MindGateEngine")
 
-app = FastAPI(title="MindGate AI Engine", version="1.0.7")
+app = FastAPI(
+    title="MindGate AI Engine API",
+    description="Production-Grade Local RAG System with Multi-Tenancy & Resource Control",
+    version="2.0.0"
+)
 
 # CORS Setup
 app.add_middleware(
@@ -37,50 +44,54 @@ class MindGateEngine:
         self.ollama_host = ollama_host.rstrip("/")
         self.ollama_model = ollama_model
 
-        # Core Managers
+        # Core Managers initialization
         self.vector_store = VectorStoreManager()
         self.container_memory = ContainerMemoryManager()
         self.chat_history = ChatHistoryManager()
         self.chunk_cache = ChunkCacheManager()
-        self.resource_mgr = SystemResourceManager()
+        self.resource_mgr = SystemResourceManager(ollama_url=self.ollama_host)
+        
+        # Anti-hallucination state tracker for active document
+        self.latest_uploaded_file: Optional[str] = None
 
     def ingest_document(self, file_path: str) -> Dict[str, Any]:
-        """Multi-format Document Ingestion -> Path Resolution -> Extract Chunks + Metadata -> Index in Vector DB."""
+        """Multi-format Ingestion Pipeline with Disk Caching & Vector Indexing."""
         try:
-            # FIX: Ensure proper path resolution for uploads directory
             if not os.path.exists(file_path):
                 alt_path = os.path.join("uploads", os.path.basename(file_path))
                 if os.path.exists(alt_path):
                     file_path = alt_path
 
             file_name = os.path.basename(file_path)
+            self.latest_uploaded_file = file_name
 
-            if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
-                self.vector_store.compressor.register_activity()
+            # 1. Check Chunk Cache to bypass redundant parsing
+            chunks = self.chunk_cache.get_cached_chunks(file_path)
+            cached_used = True
 
-            # 1. Parse Document using Production Parser (Supports PDF, DOCX, TXT, MD)
-            chunks = parse_pdf_with_coordinates(file_path)
-            
             if not chunks:
-                return {"status": "error", "message": "Document parsing produced zero text content."}
+                cached_used = False
+                logger.info(f"Parsing document fresh: {file_name}")
+                chunks = parse_pdf_with_coordinates(file_path)
+                
+                if not chunks:
+                    return {"status": "error", "message": "Document parsing produced zero text content."}
 
-            # Ensure file_name is strictly bound in metadata
-            for idx, chk in enumerate(chunks):
-                if "metadata" not in chk:
-                    chk["metadata"] = {}
-                chk["metadata"]["file_name"] = file_name
-                if not chk.get("chunk_id"):
-                    chk["chunk_id"] = f"{file_name}_chunk_{idx}"
+                # Ensure strict metadata bindings
+                for idx, chk in enumerate(chunks):
+                    if "metadata" not in chk:
+                        chk["metadata"] = {}
+                    chk["metadata"]["file_name"] = file_name
+                    if not chk.get("chunk_id"):
+                        chk["chunk_id"] = f"{file_name}_chunk_{idx}"
 
-            # 2. Save Chunks to Disk Cache if available
-            if hasattr(self.chunk_cache, 'save_chunks_to_cache'):
-                self.chunk_cache.save_chunks_to_cache(file_name, chunks)
+                # Save parsed chunks to disk cache
+                self.chunk_cache.save_chunks_to_cache(file_path, chunks)
+            else:
+                logger.info(f"Loaded parsed chunks from disk cache for: {file_name}")
 
-            # 3. Add / Upsert Chunks into ChromaDB Vector Database
-            if hasattr(self.vector_store, 'upsert_chunks'):
-                self.vector_store.upsert_chunks(chunks)
-            elif hasattr(self.vector_store, 'add_chunks'):
-                self.vector_store.add_chunks(chunks)
+            # 2. Upsert into Vector Store
+            self.vector_store.upsert_chunks(chunks)
 
             if hasattr(self.container_memory, 'register_document'):
                 self.container_memory.register_document(file_name)
@@ -88,67 +99,53 @@ class MindGateEngine:
             return {
                 "status": "success",
                 "file_name": file_name,
-                "total_chunks_indexed": len(chunks)
+                "total_chunks_indexed": len(chunks),
+                "cache_hit": cached_used
             }
         except Exception as e:
-            print(f"\n[CRITICAL INGESTION ERROR]: {str(e)}\n")
+            logger.error(f"[CRITICAL INGESTION ERROR]: {str(e)}", exc_info=True)
             raise Exception(f"Ingestion failed: {str(e)}")
 
     def retrieve_relevant_chunks(self, query: str, active_doc: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Grounded Metadata Retrieval:
-        1. Checks for broad overview/summary queries and fetches structural chunks.
-        2. Executes True Cosine Semantic Search with strict file_name isolation.
-        """
-        if not active_doc:
-            return []
-
+        """Grounded Metadata Retrieval with Auto-Fallback to Latest Uploaded Document."""
+        target_doc = active_doc or self.latest_uploaded_file
         retrieved_chunks = []
 
-        # Broad overview keywords detection
+        # Broad overview keyword detection for structural summaries
         broad_keywords = ["summary", "overview", "kya hai", "about", "describe", "detail", "batao"]
         is_broad = any(kw in query.lower() for kw in broad_keywords)
 
-        if is_broad and hasattr(self.vector_store, 'get_all_chunks_for_file'):
-            retrieved_chunks = self.vector_store.get_all_chunks_for_file(active_doc, limit=8)
+        if target_doc and is_broad:
+            retrieved_chunks = self.vector_store.get_all_chunks_for_file(target_doc, limit=8)
 
-        # Primary Vector Search with Strict active_doc Filter
+        # Primary Semantic Vector Search with metadata filter
         if not retrieved_chunks:
-            if hasattr(self.vector_store, 'query_similar_chunks'):
-                try:
-                    retrieved_chunks = self.vector_store.query_similar_chunks(query, top_k=8, file_name_filter=active_doc)
-                except Exception as e:
-                    print(f"[Vector Search Error]: {e}")
-                    retrieved_chunks = []
-            elif hasattr(self.vector_store, 'query'):
-                try:
-                    retrieved_chunks = self.vector_store.query(query_text=query, top_k=8, file_filter=active_doc)
-                except Exception as e:
-                    print(f"[Vector Query Error]: {e}")
-                    retrieved_chunks = []
+            retrieved_chunks = self.vector_store.query_similar_chunks(query, top_k=8, file_name_filter=target_doc)
+
+        # Absolute Fallback: Global search across all docs if target filter returns nothing
+        if not retrieved_chunks:
+            retrieved_chunks = self.vector_store.query_similar_chunks(query, top_k=5, file_name_filter=None)
 
         return retrieved_chunks
 
     def _build_prompt_and_citations(self, query: str, retrieved_chunks: List[Dict[str, Any]], active_doc: Optional[str] = None):
-        """Builds clean, grounded prompt preventing prompt leaking, echoing, and hallucinations."""
         context_str = ""
         citations = []
 
         for idx, item in enumerate(retrieved_chunks):
             meta = item.get("metadata", {})
-            file_n = meta.get('file_name', active_doc or 'Document')
+            file_n = meta.get('file_name', active_doc or self.latest_uploaded_file or 'Document')
             p_num = meta.get('page_number', meta.get('page', 1))
             l_start = meta.get('line_start', 1)
             l_end = meta.get('line_end', 1)
 
-            citation_label = f""
-            context_str += f"--- CONTEXT BLOCK {idx+1} ({citation_label}) ---\n{item.get('text', '')}\n\n"
+            context_str += f"--- CONTEXT BLOCK {idx+1} ---\n{item.get('text', '')}\n\n"
 
             citations.append({
                 "file_name": file_n,
                 "page": p_num,
                 "lines": f"{l_start}-{l_end}",
-                "citation_text": citation_label
+                "citation_text": ""
             })
 
         system_prompt = (
@@ -167,13 +164,10 @@ class MindGateEngine:
         return system_prompt, citations
 
     def ask(self, query: str, active_doc: Optional[str] = None) -> Dict[str, Any]:
-        """Synchronous Query Execution."""
+        """Synchronous RAG query execution."""
         if query.startswith("@"):
             search_term = query[1:]
             return self.container_memory.handle_at_trigger(search_term)
-
-        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
-            self.vector_store.compressor.register_activity()
 
         self.chat_history.save_message(role="user", content=query)
 
@@ -212,10 +206,7 @@ class MindGateEngine:
         }
 
     def ask_stream(self, query: str, active_doc: Optional[str] = None) -> Generator[str, None, None]:
-        """True SSE Streaming Endpoint."""
-        if hasattr(self.vector_store, 'compressor') and self.vector_store.compressor:
-            self.vector_store.compressor.register_activity()
-
+        """Real-time SSE token streaming RAG execution."""
         self.chat_history.save_message(role="user", content=query)
 
         retrieved_chunks = self.retrieve_relevant_chunks(query, active_doc)
@@ -229,7 +220,6 @@ class MindGateEngine:
 
         system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_doc)
 
-        # First Event: Send Citations Metadata Payload to UI
         yield f"data: {json.dumps({'citations': citations})}\n\n"
 
         url = f"{self.ollama_host}/api/generate"
@@ -251,9 +241,7 @@ class MindGateEngine:
                         token = decoded.get("response", "")
                         done = decoded.get("done", False)
                         full_response += token
-                        
                         yield f"data: {json.dumps({'token': token, 'done': done})}\n\n"
-
         except Exception as e:
             err_msg = f"\n[Streaming Error]: Ollama execution failed: {str(e)}"
             yield f"data: {json.dumps({'token': err_msg, 'done': True})}\n\n"
@@ -269,7 +257,7 @@ class MindGateEngine:
 engine = MindGateEngine()
 
 
-# --- FastAPI Routes ---
+# --- FastAPI Endpoints ---
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui():
@@ -293,8 +281,9 @@ async def upload_file(file: UploadFile = File(...)):
         result = engine.ingest_document(full_path)
         return {"status": "success", "data": result}
     except Exception as e:
-        print(f"[Upload Server Error]: {e}")
+        logger.error(f"[Upload Server Error]: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/chat/stream")
 async def chat_stream(request: Request):
