@@ -282,7 +282,7 @@ async def serve_ui():
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
-        upload_dir = "uploads"
+        upload_dir = os.path.abspath("uploads")
         os.makedirs(upload_dir, exist_ok=True)
         
         full_path = os.path.join(upload_dir, file.filename)
@@ -295,7 +295,6 @@ async def upload_file(file: UploadFile = File(...)):
     except Exception as e:
         print(f"[Upload Server Error]: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.post("/chat/stream")
 async def chat_stream(request: Request):
