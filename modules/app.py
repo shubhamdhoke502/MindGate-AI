@@ -8,6 +8,7 @@ from fastapi import FastAPI, UploadFile, File, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 
 # Core Production Modules
 from modules.parser import parse_pdf_production_grade as parse_pdf_with_coordinates
@@ -23,7 +24,7 @@ logger = logging.getLogger("MindGateEngine")
 app = FastAPI(
     title="MindGate AI Engine API",
     description="Production-Grade Local RAG System with Multi-Tenancy & Resource Control",
-    version="2.0.0"
+    version="2.0.1"
 )
 
 # CORS Setup
@@ -275,10 +276,12 @@ async def upload_file(file: UploadFile = File(...)):
         
         full_path = os.path.join(upload_dir, file.filename)
 
+        content = await file.read()
         with open(full_path, "wb") as buffer:
-            buffer.write(await file.read())
+            buffer.write(content)
 
-        result = engine.ingest_document(full_path)
+        # Threadpool offloading prevents blocking asyncio event loop
+        result = await run_in_threadpool(engine.ingest_document, full_path)
         return {"status": "success", "data": result}
     except Exception as e:
         logger.error(f"[Upload Server Error]: {e}", exc_info=True)
