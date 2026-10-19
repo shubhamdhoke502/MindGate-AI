@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindGate AI</title>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --bg-dark: #1e1e1e;
@@ -26,6 +24,23 @@
             padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+
+        .fa-solid, .fa-regular {
+            display: inline-block;
+            min-width: 1em;
+            font-style: normal;
+            text-align: center;
+        }
+
+        .fa-plus::before { content: "+"; }
+        .fa-folder-open::before { content: "\25A3"; }
+        .fa-broom::before { content: "\2733"; }
+        .fa-bars::before { content: "\2630"; }
+        .fa-circle::before { content: "\2022"; }
+        .fa-file-pdf::before { content: "\25A4"; }
+        .fa-arrow-up::before { content: "\2191"; }
+        .fa-check::before { content: "\2713"; }
+        .fa-copy::before { content: "\25A1"; }
 
         body {
             background-color: var(--bg-dark);
@@ -170,12 +185,18 @@
             color: #4ade80;
         }
 
+        .status-badge.error {
+            display: inline-flex;
+            color: #f87171;
+        }
+
         /* Welcome Centered Screen */
         .welcome-screen {
             position: absolute;
             top: 40%;
             left: 50%;
             transform: translate(-50%, -50%);
+            width: min(90%, 640px);
             text-align: center;
             display: flex;
             flex-direction: column;
@@ -273,6 +294,27 @@
             padding-left: 4px;
         }
 
+        .citation-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .citation-link {
+            color: #93c5fd;
+            font-size: 12px;
+            text-decoration: none;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 5px 8px;
+        }
+
+        .citation-link:hover {
+            background: var(--hover-bg);
+            text-decoration: underline;
+        }
+
         .ai-copy-btn {
             background: transparent;
             border: none;
@@ -297,6 +339,29 @@
             background-color: var(--bg-dark);
             border-top: 1px solid var(--border-color);
             position: relative;
+        }
+
+        .smart-chips {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0 0 12px;
+        }
+
+        .smart-chip {
+            color: var(--text-muted);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .smart-chip:hover {
+            color: var(--text-main);
+            background: var(--hover-bg);
         }
 
         .input-wrapper {
@@ -400,7 +465,7 @@
         </button>
 
         <button class="btn-sidebar" onclick="triggerFileUpload()">
-            <i class="fa-solid fa-folder-open"></i> Upload PDF Document
+            <i class="fa-solid fa-folder-open"></i> Upload document
         </button>
 
         <div class="doc-list" id="docListContainer">
@@ -439,6 +504,11 @@
 
         <!-- Footer Input -->
         <div class="footer">
+            <div class="smart-chips" aria-label="Suggested document questions">
+                <button class="smart-chip" onclick="runSmartPrompt('Summarize this document.')">Summary</button>
+                <button class="smart-chip" onclick="runSmartPrompt('List the key points in this document.')">Key points</button>
+                <button class="smart-chip" onclick="runSmartPrompt('List the action items stated in this document.')">Action items</button>
+            </div>
             <!-- Mention Popup Dropdown -->
             <div class="mention-popup" id="mentionPopup"></div>
 
@@ -460,7 +530,7 @@
                     <i class="fa-solid fa-arrow-up"></i>
                 </button>
             </div>
-            <input type="file" id="hiddenFileInput" accept=".pdf,.txt,.docx" onchange="uploadDocument(event)">
+            <input type="file" id="hiddenFileInput" accept=".pdf,.txt,.md,.docx" onchange="uploadDocument(event)">
         </div>
     </div>
 
@@ -468,6 +538,48 @@
         let activeDocument = null;
         let uploadedFiles = [];
         let documentChatHistories = {};
+
+        loadDocuments();
+
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/documents');
+                if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
+                const data = await response.json();
+                (data.documents || []).forEach(documentInfo => {
+                    if (!uploadedFiles.includes(documentInfo.file_name)) {
+                        uploadedFiles.push(documentInfo.file_name);
+                    }
+                    addDocumentToSidebar(documentInfo.file_name);
+                });
+                const historyResponse = await fetch('/history');
+                if (!historyResponse.ok) {
+                    throw new Error(`History request failed (HTTP ${historyResponse.status})`);
+                }
+                const historyData = await historyResponse.json();
+                (historyData.history || []).forEach(message => {
+                    if (!message.file_name || !uploadedFiles.includes(message.file_name)) return;
+                    if (!documentChatHistories[message.file_name]) {
+                        documentChatHistories[message.file_name] = [];
+                    }
+                    documentChatHistories[message.file_name].push({
+                        role: message.role === 'user' ? 'user' : 'ai',
+                        text: message.content,
+                        citations: message.citations || []
+                    });
+                });
+                const rememberedDocument = localStorage.getItem('mindgate.activeDocument');
+                if (rememberedDocument && uploadedFiles.includes(rememberedDocument)) {
+                    const item = Array.from(id('docListContainer').children)
+                        .find(element => element.dataset.filename === rememberedDocument);
+                    selectDocument(rememberedDocument, item);
+                } else if (activeDocument) {
+                    renderChatHistory(activeDocument);
+                }
+            } catch (err) {
+                console.error('Could not load workspace documents:', err);
+            }
+        }
 
         // Sidebar Toggle Collapse Logic
         function toggleSidebar() {
@@ -498,7 +610,11 @@
                     matchedDocs.forEach(doc => {
                         const item = document.createElement('div');
                         item.className = 'mention-item';
-                        item.innerHTML = `<i class="fa-regular fa-file-pdf"></i> ${doc}`;
+                        const icon = document.createElement('i');
+                        icon.className = 'fa-regular fa-file-pdf';
+                        const label = document.createElement('span');
+                        label.textContent = doc;
+                        item.append(icon, label);
                         item.onclick = () => selectMention(doc, atIndex);
                         popup.appendChild(item);
                     });
@@ -512,12 +628,12 @@
         function selectMention(docName, atIndex) {
             const input = id('userPrompt');
             const beforeAt = input.value.substring(0, atIndex);
+            const documentItem = Array.from(id('docListContainer').children)
+                .find(element => element.dataset.filename === docName);
+            selectDocument(docName, documentItem);
             input.value = `${beforeAt}@${docName} `;
             id('mentionPopup').style.display = 'none';
             input.focus();
-            
-            // Set as active recall doc
-            activeDocument = docName;
         }
 
         function handleKeyDown(event) {
@@ -540,7 +656,7 @@
             const statusText = id('statusText');
 
             statusBadge.className = "status-badge indexing";
-            statusText.innerText = "Indexing PDF...";
+            statusText.innerText = "Indexing document...";
 
             const formData = new FormData();
             formData.append('file', file);
@@ -553,7 +669,7 @@
                 
                 if (response.ok) {
                     statusBadge.className = "status-badge indexed";
-                    statusText.innerText = "PDF Indexed";
+                    statusText.innerText = "Document indexed";
                     
                     // Add to sidebar and array list
                     if (!uploadedFiles.includes(file.name)) {
@@ -565,12 +681,16 @@
                         statusBadge.className = "status-badge";
                     }, 4000);
                 } else {
-                    throw new Error("Upload Failed");
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.detail || `Upload failed (HTTP ${response.status})`);
                 }
             } catch (err) {
                 console.error("Upload error:", err);
-                statusBadge.className = "status-badge";
-                alert("File Upload / Indexing Failed!");
+                statusBadge.className = "status-badge error";
+                statusText.innerText = "Indexing failed";
+                alert(`File upload / indexing failed: ${err.message}`);
+            } finally {
+                event.target.value = '';
             }
         }
 
@@ -586,7 +706,11 @@
                 const item = document.createElement('div');
                 item.className = 'doc-item';
                 item.dataset.filename = filename;
-                item.innerHTML = `<i class="fa-regular fa-file-pdf"></i> <span>${filename}</span>`;
+                const icon = document.createElement('i');
+                icon.className = 'fa-regular fa-file-pdf';
+                const label = document.createElement('span');
+                label.textContent = filename;
+                item.append(icon, label);
                 item.onclick = () => selectDocument(filename, item);
                 docList.appendChild(item);
                 selectDocument(filename, item);
@@ -595,6 +719,7 @@
 
         function selectDocument(filename, element) {
             activeDocument = filename;
+            localStorage.setItem('mindgate.activeDocument', filename);
             document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
             if (element) element.classList.add('active');
 
@@ -603,6 +728,7 @@
 
         function startNewChat() {
             activeDocument = null;
+            localStorage.removeItem('mindgate.activeDocument');
             document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
             id('chatBox').innerHTML = '';
             id('welcomeScreen').style.opacity = '1';
@@ -616,7 +742,8 @@
             if (history.length > 0) {
                 id('welcomeScreen').style.opacity = '0';
                 history.forEach(msg => {
-                    appendMessageToUI(msg.role, msg.text, false);
+                    const row = appendMessageToUI(msg.role, msg.text, false);
+                    renderCitationLinks(row.querySelector('.message-bubble'), msg.citations || []);
                 });
             } else {
                 id('welcomeScreen').style.opacity = '1';
@@ -634,29 +761,33 @@
             });
         }
 
-        function appendMessageToUI(role, text, saveHistory = true) {
+        function appendMessageToUI(role, text, saveHistory = true, citations = []) {
             id('welcomeScreen').style.opacity = '0';
 
             const chatBox = id('chatBox');
             const row = document.createElement('div');
             row.className = `message-row ${role}`;
 
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.textContent = text;
+            row.appendChild(bubble);
+
             if (role === 'user') {
-                row.innerHTML = `
-                    <div class="message-bubble">${escapeHtml(text)}</div>
-                    <button class="user-copy-btn" onclick="copyToClipboard('${escapeJs(text)}', this)">
-                        <i class="fa-regular fa-copy"></i> Copy
-                    </button>
-                `;
+                const copyButton = document.createElement('button');
+                copyButton.className = 'user-copy-btn';
+                copyButton.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
+                copyButton.addEventListener('click', () => copyToClipboard(text, copyButton));
+                row.appendChild(copyButton);
             } else {
-                row.innerHTML = `
-                    <div class="message-bubble">${escapeHtml(text)}</div>
-                    <div class="ai-action-bar">
-                        <button class="ai-copy-btn" onclick="copyToClipboard('${escapeJs(text)}', this)">
-                            <i class="fa-regular fa-copy"></i> Copy
-                        </button>
-                    </div>
-                `;
+                const actionBar = document.createElement('div');
+                actionBar.className = 'ai-action-bar';
+                const copyButton = document.createElement('button');
+                copyButton.className = 'ai-copy-btn';
+                copyButton.innerHTML = '<i class="fa-regular fa-copy"></i> Copy';
+                copyButton.onclick = () => copyToClipboard(bubble.textContent, copyButton);
+                actionBar.appendChild(copyButton);
+                row.appendChild(actionBar);
             }
 
             chatBox.appendChild(row);
@@ -666,10 +797,34 @@
                 if (!documentChatHistories[activeDocument]) {
                     documentChatHistories[activeDocument] = [];
                 }
-                documentChatHistories[activeDocument].push({ role, text });
+                documentChatHistories[activeDocument].push({ role, text, citations });
             }
 
             return row;
+        }
+
+        function renderCitationLinks(bubble, citations) {
+            if (!citations || citations.length === 0) return;
+            const citationList = document.createElement('div');
+            citationList.className = 'citation-list';
+            citations.forEach(citation => {
+                const isPdf = citation.file_name.toLowerCase().endsWith('.pdf');
+                const label = document.createElement(isPdf ? 'a' : 'span');
+                label.className = 'citation-link';
+                label.textContent = `${citation.file_name} · p. ${citation.page}, lines ${citation.lines}`;
+                if (isPdf) {
+                    label.target = '_blank';
+                    label.rel = 'noopener noreferrer';
+                    label.href = `/documents/${encodeURIComponent(citation.file_name)}#page=${citation.page}`;
+                }
+                citationList.appendChild(label);
+            });
+            bubble.appendChild(citationList);
+        }
+
+        function runSmartPrompt(prompt) {
+            id('userPrompt').value = prompt;
+            sendMessage();
         }
 
         async function sendMessage() {
@@ -692,6 +847,7 @@
             const aiCopyBtn = aiRow.querySelector('.ai-copy-btn');
 
             let fullAiResponse = "";
+            let citations = [];
 
             try {
                 // Sent payload with all keys to prevent 422 error
@@ -700,15 +856,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         query: text,
-                        prompt: text,
-                        message: text,
-                        file_name: activeDocument,
-                        active_doc: activeDocument
+                        workspace_id: 'default_session',
+                        active_pdf: activeDocument
                     })
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Server returned HTTP ${response.status}`);
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.detail || `Server returned HTTP ${response.status}`);
                 }
 
                 const reader = response.body.getReader();
@@ -729,48 +884,63 @@
                             const jsonStr = line.replace('data: ', '').trim();
                             try {
                                 const parsed = JSON.parse(jsonStr);
+                                if (parsed.error) throw new Error(parsed.error);
+                                if (parsed.citations) citations = parsed.citations;
+                                if (parsed.recall) {
+                                    const recall = parsed.recall;
+                                    const documents = recall.matching_documents || [];
+                                    const highlights = recall.matching_highlights || [];
+                                    fullAiResponse = [
+                                        documents.length ? `Documents: ${documents.join(', ')}` : '',
+                                        ...highlights.map(item =>
+                                            `${item.pdf_name} | Page ${item.page}, Lines ${item.line_range}: ${item.key_fact}`
+                                        )
+                                    ].filter(Boolean).join('\n') || 'No matching documents or saved highlights.';
+                                    bubbleDiv.innerText = fullAiResponse;
+                                    continue;
+                                }
                                 if (parsed.token) {
                                     fullAiResponse += parsed.token;
                                     bubbleDiv.innerText = fullAiResponse;
                                     id('chatBox').scrollTop = id('chatBox').scrollHeight;
                                 }
                             } catch (e) {
-                                // Ignore non-JSON signals
+                                if (e instanceof SyntaxError) continue;
+                                throw e;
                             }
                         }
                     }
                 }
 
                 aiCopyBtn.onclick = function() { copyToClipboard(fullAiResponse, this); };
+                renderCitationLinks(bubbleDiv, citations);
 
                 if (activeDocument) {
-                    documentChatHistories[activeDocument].push({ role: 'ai', text: fullAiResponse });
+                    documentChatHistories[activeDocument].push({
+                        role: 'ai',
+                        text: fullAiResponse,
+                        citations
+                    });
                 }
 
             } catch (err) {
-                bubbleDiv.innerText = "Error streaming response.";
+                bubbleDiv.innerText = `Error: ${err.message}`;
                 console.error("Streaming error:", err);
             }
         }
 
         async function flushMemory() {
             try {
-                await fetch('/flush_memory', { method: 'POST' });
+                const response = await fetch('/flush_memory', { method: 'POST' });
+                if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
                 alert("RAM / VRAM Flushed successfully.");
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
+                alert(`Memory flush failed: ${e.message}`);
             }
         }
 
         function id(elementId) { return document.getElementById(elementId); }
-
-        function escapeHtml(str) {
-            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-
-        function escapeJs(str) {
-            return str.replace(/'/g, "\\'").replace(/\n/g, "\\n");
-        }
     </script>
 </body>
 </html>
