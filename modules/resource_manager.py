@@ -1,16 +1,19 @@
 import psutil
 import gc
-import os
+import logging
 import requests
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 class SystemResourceManager:
     """
     Monitors host RAM/VRAM, manages memory guardrails, and prevents system crashes
     by selecting appropriate model quantization configs dynamically.
     """
-    def __init__(self, ollama_url: str = "http://localhost:11434"):
+    def __init__(self, ollama_url: str = "http://localhost:11434", model_name: str = "phi3:mini"):
         self.ollama_url = ollama_url
+        self.model_name = model_name
 
     def get_system_memory_status(self) -> Dict[str, Any]:
         """Returns total, available, and percentage RAM usage."""
@@ -48,14 +51,19 @@ class SystemResourceManager:
         }
 
     def flush_memory(self):
-        """Forces Python garbage collection to clean up unused memory references."""
+        """Collect local Python garbage and unload the configured model from Ollama."""
         gc.collect()
         try:
-            # Tell Ollama to unload idle models from RAM
-            requests.post(f"{self.ollama_url}/api/generate", json={"model": "", "keep_alive": 0}, timeout=2)
-        except Exception:
-            pass
-        print("[ResourceManager]: System memory successfully flushed.")
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={"model": self.model_name, "keep_alive": 0},
+                timeout=5,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            logger.error("Could not unload Ollama model %s: %s", self.model_name, exc)
+            raise RuntimeError(f"Could not unload Ollama model {self.model_name}: {exc}") from exc
+        logger.info("Python garbage collected and Ollama model %s unloaded.", self.model_name)
 
 
 if __name__ == "__main__":
