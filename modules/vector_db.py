@@ -1,124 +1,204 @@
-import os
-import hashlib
+import json
 import logging
-from typing import List, Dict, Any, Optional
-import chromadb
-from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+import re
+import sqlite3
+from pathlib import Path
+from threading import RLock
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("MindGateVectorDB")
+_STOP_WORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
+    "have", "how", "i", "in", "is", "it", "of", "on", "or", "that", "the",
+    "this", "to", "was", "were", "what", "when", "where", "which", "who",
+    "why", "with", "का", "की", "के", "को", "में", "से", "है", "हैं",
+    "और", "क्या", "काय", "आहे", "आणि",
+}
 
-class PureBM25EmbeddingFunction(EmbeddingFunction):
-    """
-    Zero-dependency deterministic embedding function. 
-    Bypasses PyTorch / ONNX / sentence-transformers to eliminate Windows DLL initialization crashes.
-    """
-    def __call__(self, input: Documents) -> Embeddings:
-        embeddings = []
-        for text in input:
-            hash_val = int(hashlib.md5(text.encode('utf-8')).hexdigest(), 16)
-            # Generate a stable 384-dimensional float vector representation
-            vec = [(float((hash_val >> i) & 1) * 2.0 - 1.0) / (i + 1) for i in range(384)]
-            embeddings.append(vec)
-        return embeddings
 
 class VectorStoreManager:
+    """Workspace-local SQLite FTS5 store ranked with its built-in BM25."""
+
     def __init__(self, storage_dir: str = "storage/.mindgate"):
-        self.storage_dir = storage_dir
-        self.chroma_path = os.path.join(self.storage_dir, "chroma_db")
-        os.makedirs(self.chroma_path, exist_ok=True)
-
-        # Persistent enterprise ChromaDB client
-        self.client = chromadb.PersistentClient(path=self.chroma_path)
-        self.embedding_fn = PureBM25EmbeddingFunction()
-
-        # Collection initialization with explicit cosine similarity and custom embedding function
-        self.collection = self.client.get_or_create_collection(
-            name="mindgate_doc_store_v4",
-            embedding_function=self.embedding_fn,
-            metadata={"hnsw:space": "cosine"}
+        self.storage_dir = Path(storage_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        self.database_path = self.storage_dir / "mindgate.sqlite3"
+        self._lock = RLock()
+        self._connection = sqlite3.connect(
+            str(self.database_path), check_same_thread=False, timeout=30
         )
-        logger.info("VectorStoreManager initialized successfully with pure Python embedding backend.")
+        self._connection.row_factory = sqlite3.Row
+        with self._lock, self._connection:
+            self._connection.execute("PRAGMA journal_mode=WAL")
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chunks (
+                    chunk_id TEXT PRIMARY KEY,
+                    file_name TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    metadata TEXT NOT NULL
+                )
+                """
+            )
+            self._connection.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts
+                USING fts5(chunk_id UNINDEXED, text, tokenize='unicode61')
+                """
+            )
+        logger.info("Local SQLite FTS5 store initialized at %s", self.database_path)
+
+    @staticmethod
+    def _prepare_rows(chunks: List[Dict[str, Any]]) -> List[tuple[str, str, str, str]]:
+        rows = []
+        for chunk in chunks:
+            metadata = dict(chunk.get("metadata") or {})
+            chunk_id = chunk.get("chunk_id") or metadata.get("chunk_id")
+            text = str(chunk.get("text") or "").strip()
+            file_name = metadata.get("file_name")
+            if not chunk_id or not text or not file_name:
+                raise ValueError("Each indexed chunk requires an ID, text, and file_name.")
+            metadata["chunk_id"] = str(chunk_id)
+            metadata["file_name"] = str(file_name)
+            rows.append((
+                str(chunk_id),
+                str(file_name),
+                text,
+                json.dumps(metadata, ensure_ascii=False),
+            ))
+        return rows
+
+    def _write_rows(self, rows: List[tuple[str, str, str, str]]) -> None:
+        for chunk_id, file_name, text, metadata in rows:
+            self._connection.execute(
+                """
+                INSERT INTO chunks(chunk_id, file_name, text, metadata)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(chunk_id) DO UPDATE SET
+                    file_name = excluded.file_name,
+                    text = excluded.text,
+                    metadata = excluded.metadata
+                """,
+                (chunk_id, file_name, text, metadata),
+            )
+            self._connection.execute(
+                "DELETE FROM chunks_fts WHERE chunk_id = ?", (chunk_id,)
+            )
+            self._connection.execute(
+                "INSERT INTO chunks_fts(chunk_id, text) VALUES (?, ?)",
+                (chunk_id, text),
+            )
 
     def upsert_chunks(self, chunks: List[Dict[str, Any]]) -> None:
-        """Upserts document chunks with strict file_name metadata binding."""
-        if not chunks:
+        """Insert or replace document chunks and their searchable text atomically."""
+        rows = self._prepare_rows(chunks)
+        if not rows:
             return
+        with self._lock, self._connection:
+            self._write_rows(rows)
+        logger.info("Indexed %d chunks in local SQLite FTS5.", len(rows))
 
-        ids, documents, metadatas = [], [], []
-        for chunk in chunks:
-            chunk_id = chunk.get("chunk_id") or chunk.get("metadata", {}).get("chunk_id")
-            text = chunk.get("text", "").strip()
-            meta = chunk.get("metadata", {})
-
-            if text and chunk_id:
-                ids.append(str(chunk_id))
-                documents.append(text)
-                metadatas.append(meta)
-
-        if documents:
-            self.collection.upsert(
-                ids=ids,
-                documents=documents,
-                metadatas=metadatas
+    def replace_document(self, file_name: str, chunks: List[Dict[str, Any]]) -> None:
+        """Atomically replace every indexed chunk for one source document."""
+        rows = self._prepare_rows(chunks)
+        if any(row[1] != file_name for row in rows):
+            raise ValueError("All replacement chunks must belong to the requested file.")
+        with self._lock, self._connection:
+            self._connection.execute(
+                """
+                DELETE FROM chunks_fts
+                WHERE chunk_id IN (SELECT chunk_id FROM chunks WHERE file_name = ?)
+                """,
+                (file_name,),
             )
-            logger.info(f"Successfully upserted {len(documents)} chunks into ChromaDB.")
+            self._connection.execute(
+                "DELETE FROM chunks WHERE file_name = ?", (file_name,)
+            )
+            self._write_rows(rows)
+        logger.info("Replaced indexed content for %s (%d chunks).", file_name, len(rows))
 
     def add_chunks(self, chunks: List[Dict[str, Any]]) -> None:
         self.upsert_chunks(chunks)
 
-    def query_similar_chunks(self, query: str, top_k: int = 8, file_name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Semantic Vector Search with strict metadata isolation and multi-tier exception fallback."""
-        where_clause = {"file_name": file_name_filter} if file_name_filter else None
+    def query_similar_chunks(
+        self,
+        query: str,
+        top_k: int = 2,
+        file_name_filter: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return lexical BM25 matches, optionally confined to one document."""
+        terms = [
+            term for term in re.findall(r"\w+", query.casefold(), flags=re.UNICODE)
+            if term not in _STOP_WORDS
+        ]
+        if not terms or top_k <= 0:
+            return []
+        expression = " OR ".join(
+            f'"{term.replace(chr(34), chr(34) * 2)}"' for term in dict.fromkeys(terms)
+        )
+        sql = """
+            SELECT chunks.chunk_id, chunks.text, chunks.metadata
+            FROM chunks_fts
+            JOIN chunks ON chunks.chunk_id = chunks_fts.chunk_id
+            WHERE chunks_fts MATCH ?
+        """
+        parameters: List[Any] = [expression]
+        if file_name_filter is not None:
+            sql += " AND chunks.file_name = ?"
+            parameters.append(file_name_filter)
+        sql += " ORDER BY bm25(chunks_fts), chunks.chunk_id LIMIT ?"
+        parameters.append(top_k)
 
-        results = None
-        try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=top_k,
-                where=where_clause
-            )
-        except Exception as e:
-            logger.warning(f"[VectorDB Query Filter Exception]: {e}. Falling back to global search.")
-            try:
-                results = self.collection.query(
-                    query_texts=[query],
-                    n_results=top_k
-                )
-            except Exception as inner_e:
-                logger.error(f"[VectorDB Fatal Query Error]: {inner_e}")
-                return []
-
-        formatted = []
-        if results and results.get("documents") and results["documents"][0]:
-            docs = results["documents"][0]
-            metas = results["metadatas"][0] if results.get("metadatas") else []
-            ids = results["ids"][0] if results.get("ids") else []
-
-            for i in range(len(docs)):
-                formatted.append({
-                    "chunk_id": ids[i] if i < len(ids) else f"chunk_{i}",
-                    "text": docs[i],
-                    "metadata": metas[i] if i < len(metas) else {}
-                })
-
-        return formatted
+        with self._lock:
+            rows = self._connection.execute(sql, parameters).fetchall()
+        return [
+            {
+                "chunk_id": row["chunk_id"],
+                "text": row["text"],
+                "metadata": json.loads(row["metadata"]),
+            }
+            for row in rows
+        ]
 
     def get_all_chunks_for_file(self, file_name: str, limit: int = 8) -> List[Dict[str, Any]]:
-        """Retrieves structural top chunks directly for overview/summary queries."""
-        try:
-            results = self.collection.get(where={"file_name": file_name})
-            docs = results.get("documents", [])
-            metas = results.get("metadatas", [])
-            ids = results.get("ids", [])
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT chunk_id, text, metadata FROM chunks
+                WHERE file_name = ?
+                ORDER BY json_extract(metadata, '$.page_number'),
+                         json_extract(metadata, '$.line_start'), chunk_id
+                LIMIT ?
+                """,
+                (file_name, max(0, limit)),
+            ).fetchall()
+        return [
+            {
+                "chunk_id": row["chunk_id"],
+                "text": row["text"],
+                "metadata": json.loads(row["metadata"]),
+            }
+            for row in rows
+        ]
 
-            chunks = []
-            for i in range(min(len(docs), limit)):
-                chunks.append({
-                    "chunk_id": ids[i] if i < len(ids) else f"chunk_{i}",
-                    "text": docs[i],
-                    "metadata": metas[i] if i < len(metas) else {}
-                })
-            return chunks
-        except Exception as e:
-            logger.error(f"[VectorDB Document Get Exception]: {e}")
-            return []
+    def list_documents(self) -> List[str]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT DISTINCT file_name FROM chunks ORDER BY file_name COLLATE NOCASE"
+            ).fetchall()
+        return [row["file_name"] for row in rows]
+
+    def remove_document(self, file_name: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute(
+                "DELETE FROM chunks_fts WHERE chunk_id IN "
+                "(SELECT chunk_id FROM chunks WHERE file_name = ?)",
+                (file_name,),
+            )
+            self._connection.execute(
+                "DELETE FROM chunks WHERE file_name = ?", (file_name,)
+            )
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
