@@ -1,5 +1,32 @@
 # MindGate AI — Change Log
 
+## [Unreleased] - 2026-10-18
+
+### Fixed
+
+- Replaced deterministic MD5 pseudo-vectors as the retrieval ranking signal with local BM25 ranking.
+- Replaced the Windows-crashing Chroma native index with Python SQLite FTS5/BM25 after reproducing access violations in both minimal Chroma 1.5.9 writes and the pinned 0.4.24 / NumPy 2 combination. Existing Chroma files are not deleted.
+- Removed the selected-document fallback that could answer with chunks from another document.
+- Preserved parser bounding-box metadata in the local index.
+- Corrected extracted PDF line coordinates and made cached chunks filename-aware.
+- Isolated indexes, caches, histories, and memory by validated workspace ID.
+- Bounded and staged uploads; rejected unsafe workspace IDs, unsupported types, oversized files, and workspace-cap violations.
+- Surfaced Ollama inference failures instead of returning error text as a successful answer.
+
+### Added
+
+- Restored workspace document lists and clickable page-level PDF source links.
+- Added summary/key-points/action-items chips, persistent per-document chat restoration, and answer-to-memory citation archival.
+- Added a Windows launcher and repository-wide discoverable ingestion, parser, retrieval, workspace isolation, and API integration tests.
+- Documented setup, actual runtime behavior, privacy boundaries, requirement audit, performance sample, and remaining limitations.
+- Verified a local HTTP upload → SQLite indexing → `phi3:mini` SSE answer with page/line source metadata.
+- Re-ran full repository `unittest` discovery: 21 tests passed; verified live sync/stream answers, no-context behavior, `@` recall, a generated 100-page local indexing run, and launcher health check.
+
+### Changed
+
+- Removed the unusable Chroma/Sentence-Transformers stack and unused rank-bm25 package; added direct DOCX and resource-monitor dependencies.
+- Removed the remote Font Awesome stylesheet to keep runtime UI assets local.
+
 ## [Unreleased] - 2026-09-27
 
 ### Added
