@@ -1,7 +1,10 @@
 import os
 import json
 import hashlib
+import logging
 from typing import List, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 class ChunkCacheManager:
     """
@@ -17,8 +20,10 @@ class ChunkCacheManager:
         os.makedirs(self.cache_dir, exist_ok=True)
 
     def _get_file_hash(self, file_path: str) -> str:
-        """Generates MD5 hash of PDF file to detect changes."""
-        hasher = hashlib.md5()
+        """Hashes content and name because cached chunks contain the source file name."""
+        hasher = hashlib.sha256()
+        hasher.update(os.path.basename(file_path).encode("utf-8"))
+        hasher.update(b"\0")
         with open(file_path, "rb") as f:
             buf = f.read(65536)
             while len(buf) > 0:
@@ -33,8 +38,12 @@ class ChunkCacheManager:
         if os.path.exists(cache_file):
             try:
                 with open(cache_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
+                    chunks = json.load(f)
+                if not isinstance(chunks, list):
+                    raise ValueError("Cached chunks must be a JSON array.")
+                return chunks
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                logger.warning("Ignoring invalid chunk cache %s: %s", cache_file, exc)
                 return None
         return None
 
@@ -42,5 +51,7 @@ class ChunkCacheManager:
         """Saves extracted chunks and metadata to disk cache."""
         file_hash = self._get_file_hash(pdf_path)
         cache_file = os.path.join(self.cache_dir, f"{file_hash}.json")
-        with open(cache_file, "w", encoding="utf-8") as f:
+        temporary_file = f"{cache_file}.tmp"
+        with open(temporary_file, "w", encoding="utf-8") as f:
             json.dump(chunks, f, indent=2, ensure_ascii=False)
+        os.replace(temporary_file, cache_file)
