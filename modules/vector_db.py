@@ -24,6 +24,25 @@ class VectorStoreManager:
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         self.database_path = self.storage_dir / "mindgate.sqlite3"
         self._lock = RLock()
+        self._connection = None
+        self._connect()
+        logger.info("Local SQLite FTS5 store initialized at %s", self.database_path)
+
+    def _connect(self) -> None:
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+        if self._connection is not None:
+            try:
+                self._connection.execute("SELECT 1")
+                if self.database_path.exists():
+                    return
+            except sqlite3.Error:
+                pass
+            try:
+                self._connection.close()
+            except sqlite3.Error:
+                pass
+            self._connection = None
+
         self._connection = sqlite3.connect(
             str(self.database_path), check_same_thread=False, timeout=30
         )
@@ -46,7 +65,10 @@ class VectorStoreManager:
                 USING fts5(chunk_id UNINDEXED, text, tokenize='unicode61')
                 """
             )
-        logger.info("Local SQLite FTS5 store initialized at %s", self.database_path)
+
+    def _ensure_database_present(self) -> None:
+        if self._connection is None or not self.database_path.exists():
+            self._connect()
 
     @staticmethod
     def _prepare_rows(chunks: List[Dict[str, Any]]) -> List[tuple[str, str, str, str]]:
@@ -91,6 +113,7 @@ class VectorStoreManager:
 
     def upsert_chunks(self, chunks: List[Dict[str, Any]]) -> None:
         """Insert or replace document chunks and their searchable text atomically."""
+        self._ensure_database_present()
         rows = self._prepare_rows(chunks)
         if not rows:
             return
@@ -100,6 +123,7 @@ class VectorStoreManager:
 
     def replace_document(self, file_name: str, chunks: List[Dict[str, Any]]) -> None:
         """Atomically replace every indexed chunk for one source document."""
+        self._ensure_database_present()
         rows = self._prepare_rows(chunks)
         if any(row[1] != file_name for row in rows):
             raise ValueError("All replacement chunks must belong to the requested file.")
@@ -127,6 +151,7 @@ class VectorStoreManager:
         file_name_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Return lexical BM25 matches, optionally confined to one document."""
+        self._ensure_database_present()
         terms = [
             term for term in re.findall(r"\w+", query.casefold(), flags=re.UNICODE)
             if term not in _STOP_WORDS
@@ -161,6 +186,7 @@ class VectorStoreManager:
         ]
 
     def get_all_chunks_for_file(self, file_name: str, limit: int = 8) -> List[Dict[str, Any]]:
+        self._ensure_database_present()
         with self._lock:
             rows = self._connection.execute(
                 """
@@ -182,6 +208,7 @@ class VectorStoreManager:
         ]
 
     def list_documents(self) -> List[str]:
+        self._ensure_database_present()
         with self._lock:
             rows = self._connection.execute(
                 "SELECT DISTINCT file_name FROM chunks ORDER BY file_name COLLATE NOCASE"
@@ -189,6 +216,7 @@ class VectorStoreManager:
         return [row["file_name"] for row in rows]
 
     def remove_document(self, file_name: str) -> None:
+        self._ensure_database_present()
         with self._lock, self._connection:
             self._connection.execute(
                 "DELETE FROM chunks_fts WHERE chunk_id IN "
@@ -201,4 +229,6 @@ class VectorStoreManager:
 
     def close(self) -> None:
         with self._lock:
-            self._connection.close()
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
