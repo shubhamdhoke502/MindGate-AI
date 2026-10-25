@@ -23,10 +23,16 @@ class ChatHistoryManager:
 
     def _ensure_file_exists(self):
         with self._lock:
+            directory = os.path.dirname(self.history_file)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
             if not os.path.exists(self.history_file):
                 self._write_history([])
 
     def _write_history(self, history: List[Dict]) -> None:
+        directory = os.path.dirname(self.history_file)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
         temporary_file = f"{self.history_file}.tmp"
         with open(temporary_file, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2, ensure_ascii=False)
@@ -40,6 +46,7 @@ class ChatHistoryManager:
         file_name: Optional[str] = None,
     ):
         """Appends a new chat message to persistent storage."""
+        self._ensure_file_exists()
         with self._lock:
             history = self.get_all_messages()
             history.append({
@@ -52,7 +59,10 @@ class ChatHistoryManager:
 
     def get_all_messages(self) -> List[Dict]:
         """Loads all historical messages for the active workspace."""
+        self._ensure_file_exists()
         with self._lock:
+            if not os.path.exists(self.history_file):
+                self._write_history([])
             with open(self.history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
             if not isinstance(history, list):
