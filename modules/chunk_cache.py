@@ -33,6 +33,7 @@ class ChunkCacheManager:
 
     def get_cached_chunks(self, pdf_path: str) -> Optional[List[Dict]]:
         """Retrieves cached chunks if file was previously parsed."""
+        os.makedirs(self.cache_dir, exist_ok=True)
         file_hash = self._get_file_hash(pdf_path)
         cache_file = os.path.join(self.cache_dir, f"{file_hash}.json")
         if os.path.exists(cache_file):
@@ -49,6 +50,7 @@ class ChunkCacheManager:
 
     def save_chunks_to_cache(self, pdf_path: str, chunks: List[Dict]):
         """Saves extracted chunks and metadata to disk cache."""
+        os.makedirs(self.cache_dir, exist_ok=True)
         file_hash = self._get_file_hash(pdf_path)
         cache_file = os.path.join(self.cache_dir, f"{file_hash}.json")
         temporary_file = f"{cache_file}.tmp"
