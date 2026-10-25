@@ -20,6 +20,7 @@ class ContainerMemoryManager:
 
     def _ensure_memory_file(self) -> None:
         """Creates an empty memory structure if it does not exist."""
+        os.makedirs(self.workspace_dir, exist_ok=True)
         if not os.path.exists(self.memory_file):
             initial_data = {
                 "workspace_id": os.path.basename(self.workspace_dir),
@@ -31,6 +32,7 @@ class ContainerMemoryManager:
 
     def _load_file(self) -> Dict[str, Any]:
         """Loads raw JSON memory file."""
+        self._ensure_memory_file()
         with open(self.memory_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict) or not isinstance(data.get("documents"), list) or not isinstance(data.get("memory_highlights"), list):
@@ -39,6 +41,7 @@ class ContainerMemoryManager:
 
     def _save_file(self, data: Dict[str, Any]) -> None:
         """Saves JSON memory data to disk."""
+        os.makedirs(self.workspace_dir, exist_ok=True)
         temporary_file = f"{self.memory_file}.tmp"
         with open(temporary_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
