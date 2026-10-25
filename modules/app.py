@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import unicodedata
 import ipaddress
 import urllib.request
 from pathlib import Path
@@ -115,22 +117,52 @@ class MindGateEngine:
             logger.error(f"[CRITICAL INGESTION ERROR]: {str(e)}", exc_info=True)
             raise Exception(f"Ingestion failed: {str(e)}")
 
+    @staticmethod
+    def _normalize_query_terms(query: str) -> List[str]:
+        text = unicodedata.normalize("NFKC", query or "")
+        text = text.casefold()
+        text = re.sub(r"[\u2010-\u2015\u2212]", "-", text)
+        terms = re.findall(r"[\w]+", text, flags=re.UNICODE)
+        stop_words = {
+            "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+            "has", "have", "how", "i", "in", "is", "it", "of", "on", "or",
+            "that", "the", "this", "to", "was", "were", "what", "when",
+            "where", "which", "who", "why", "with", "का", "की", "के", "को",
+            "में", "से", "है", "हैं", "और", "क्या", "काय", "आहे", "आणि",
+            "do", "does", "did", "can", "could", "should", "would", "will",
+            "about", "briefly", "explain", "tell", "what", "when", "why",
+            "kya", "kya", "hai", "hoga", "nahi", "kya", "kitna", "kitne",
+            "mujhe", "mere", "hum", "ye", "vo", "us", "ek", "aur", "par",
+        }
+        return [term for term in terms if term and term not in stop_words and len(term) > 1]
+
     def retrieve_relevant_chunks(self, query: str, active_doc: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieve chunks from the selected document or this workspace only."""
         target_doc = active_doc
-        retrieved_chunks = []
-
-        # Broad overview keyword detection for structural summaries
-        broad_keywords = ["summary", "overview", "kya hai", "about", "describe", "detail", "batao"]
-        is_broad = any(kw in query.lower() for kw in broad_keywords)
+        broad_keywords = ["summary", "overview", "kya hai", "about", "describe", "detail", "batao", "briefly"]
+        is_broad = any(kw in (query or "").lower() for kw in broad_keywords)
 
         if target_doc and is_broad:
-            retrieved_chunks = self.vector_store.get_all_chunks_for_file(target_doc, limit=2)
+            return self.vector_store.get_all_chunks_for_file(target_doc, limit=8)
 
-        if not retrieved_chunks:
-            retrieved_chunks = self.vector_store.query_similar_chunks(
-                query, top_k=2, file_name_filter=target_doc
-            )
+        retrieved_chunks = self.vector_store.query_similar_chunks(
+            query, top_k=5, file_name_filter=target_doc
+        )
+
+        if target_doc and not retrieved_chunks:
+            fallback_chunks = self.vector_store.get_all_chunks_for_file(target_doc, limit=12)
+            if fallback_chunks:
+                query_terms = set(self._normalize_query_terms(query))
+                scored = []
+                for chunk in fallback_chunks:
+                    chunk_text = chunk.get("text", "") or ""
+                    chunk_terms = set(self._normalize_query_terms(chunk_text))
+                    overlap = len(query_terms & chunk_terms)
+                    if overlap or not query_terms:
+                        scored.append((overlap, chunk))
+                if scored:
+                    scored.sort(key=lambda item: (-item[0], item[1].get("metadata", {}).get("page_number", 0)))
+                    retrieved_chunks = [chunk for _, chunk in scored[:2]]
 
         return retrieved_chunks
 
@@ -182,6 +214,37 @@ class MindGateEngine:
                 key_fact=answer,
             )
 
+    def _get_available_ollama_models(self) -> List[str]:
+        try:
+            req = urllib.request.Request(
+                f"{self.ollama_host}/api/tags",
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except Exception as exc:  # pragma: no cover - surfaced to caller as runtime error
+            raise RuntimeError(f"Local Ollama service is unavailable at {self.ollama_host}: {exc}") from exc
+
+        models: List[str] = []
+        for item in payload.get("models", []):
+            name = item.get("name") or item.get("model")
+            if name:
+                models.append(str(name))
+        return models
+
+    def _ensure_ollama_model_available(self) -> None:
+        available = self._get_available_ollama_models()
+        if not available:
+            raise RuntimeError(
+                f"Ollama is running but no local models were discovered at {self.ollama_host}. "
+                "Install a model such as 'phi3:mini' before asking a question."
+            )
+        if self.ollama_model not in available:
+            raise RuntimeError(
+                f"Configured Ollama model '{self.ollama_model}' is not installed. "
+                f"Available local models: {', '.join(available)}."
+            )
+
     def ask(self, query: str, active_doc: Optional[str] = None) -> Dict[str, Any]:
         """Synchronous RAG query execution."""
         if query.startswith("@"):
@@ -200,6 +263,7 @@ class MindGateEngine:
             return {"answer": no_ctx_msg, "citations": []}
 
         system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_doc)
+        self._ensure_ollama_model_available()
 
         url = f"{self.ollama_host}/api/generate"
         payload = {
@@ -253,6 +317,12 @@ class MindGateEngine:
             return
 
         system_prompt, citations = self._build_prompt_and_citations(query, retrieved_chunks, active_doc)
+        try:
+            self._ensure_ollama_model_available()
+        except RuntimeError as exc:
+            logger.error("Local Ollama model validation failed: %s", exc)
+            yield f"data: {json.dumps({'error': str(exc), 'done': True}, ensure_ascii=False)}\n\n"
+            return
 
         yield f"data: {json.dumps({'citations': citations})}\n\n"
 
@@ -289,6 +359,12 @@ class MindGateEngine:
             file_name=active_doc,
         )
         self._archive_answer(full_response, citations)
+
+    def close(self) -> None:
+        try:
+            self.vector_store.close()
+        except Exception:
+            pass
 
     def get_chat_history(self) -> List[Dict]:
         return self.chat_history.get_all_messages()
