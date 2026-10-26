@@ -1,3 +1,4 @@
+<img width="1920" height="1080" alt="Screenshot 2026-10-26 222314" src="https://github.com/user-attachments/assets/e947a8ae-74d3-4479-b207-c3030faad310" />
 # MindGate AI
 ### System Architecture & Local AI Document Research Engine
 
