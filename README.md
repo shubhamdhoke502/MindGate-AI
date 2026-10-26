@@ -1,7 +1,6 @@
-<img width="2600" height="384" alt="Gemini_Generated_Image_fj1fnjfj1fnjfj1f" src="https://github.com/user-attachments/assets/49501257-49d2-4649-989f-44e5f3ed9cee" />
-<img width="1920" height="1080" alt="Screenshot 2026-10-26 222314" src="https://github.com/user-attachments/assets/e947a8ae-74d3-4479-b207-c3030faad310" />
-# MindGate AI
-### System Architecture & Local AI Document Research Engine
+<img width="1920" height="1080" alt="Screenshot 2026-10-26 222314" src="https://github.com/user-attachments/assets/d133120e-0557-49fe-bfb3-3c52aed284be" />
+<img width="2600" height="384" alt="Gemini_Generated_Image_fj1fnjfj1fnjfj1f" src="https://github.com/user-attachments/assets/2d2d7daa-9f8a-4da0-b19e-8fdcecf7f958" />
+## MindGate AI System Architecture & Local AI Document Research Engine
 
 **Created by:** Shubham Dhoke  
 **Project Type:** Privacy-First, Local AI Document Research Engine  
