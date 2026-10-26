@@ -1,5 +1,4 @@
-MindGate AI
-System Architecture & Local AI Document Research Engine
+## MindGate AI System Architecture & Local AI Document Research Engine
 
 **Created by:** Shubham Dhoke  
 **Project Type:** Privacy-First, Local AI Document Research Engine  
