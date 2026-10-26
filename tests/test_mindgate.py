@@ -1,4 +1,5 @@
 import gc
+import shutil
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -232,6 +233,41 @@ class RetrievalTests(unittest.TestCase):
             messages = history.get_all_messages()
 
         self.assertEqual(len(messages), 40)
+
+    def test_deleted_storage_directory_is_recreated_for_active_engine(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            source = workspace / "policy.txt"
+            source.write_text("Refunds are available within fourteen days.", encoding="utf-8")
+            engine = MindGateEngine(workspace_dir=str(workspace))
+            engine.ingest_document(str(source))
+
+            engine.vector_store.close()
+            shutil.rmtree(workspace / ".mindgate", ignore_errors=True)
+            engine.vector_store._ensure_database_present()
+            engine.ingest_document(str(source))
+            result = engine.vector_store.query_similar_chunks("fourteen days", file_name_filter="policy.txt")
+            engine.close()
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["metadata"]["file_name"], "policy.txt")
+
+    def test_active_document_fallback_handles_paraphrased_questions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            engine = MindGateEngine(workspace_dir=directory)
+            engine.vector_store.upsert_chunks([
+                {
+                    "chunk_id": "policy-1",
+                    "text": "Refund requests are accepted within fourteen calendar days.",
+                    "metadata": {"file_name": "policy.pdf", "page_number": 2, "line_start": 5, "line_end": 7},
+                }
+            ])
+
+            result = engine.retrieve_relevant_chunks("How long are refund requests valid?", active_doc="policy.pdf")
+            engine.vector_store.close()
+
+        self.assertEqual(len(result), 1)
+        self.assertIn("fourteen calendar days", result[0]["text"])
 
     def test_remote_ollama_endpoint_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "loopback"):
