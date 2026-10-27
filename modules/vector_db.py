@@ -185,7 +185,7 @@ class VectorStoreManager:
             for row in rows
         ]
 
-    def get_all_chunks_for_file(self, file_name: str, limit: int = 8) -> List[Dict[str, Any]]:
+    def get_all_chunks_for_file(self, file_name: str, limit: Optional[int] = 8) -> List[Dict[str, Any]]:
         self._ensure_database_present()
         with self._lock:
             rows = self._connection.execute(
@@ -196,7 +196,7 @@ class VectorStoreManager:
                          json_extract(metadata, '$.line_start'), chunk_id
                 LIMIT ?
                 """,
-                (file_name, max(0, limit)),
+                (file_name, -1 if limit is None else max(0, limit)),
             ).fetchall()
         return [
             {
