@@ -396,3 +396,4 @@ class MindGateEngine:
 
     def get_chat_history(self) -> List[Dict]:
         return self.chat_history.get_all_messages()
+    
